@@ -158,6 +158,15 @@ pub fn run_editor(config: EditorConfig) -> EditorResult {
         let mut is_dark = config.theme != "light";
         let colors = theme_colors(is_dark);
 
+        let app_name = if is_dark {
+            NSAppearanceNameDarkAqua
+        } else {
+            NSAppearanceNameAqua
+        };
+        if let Some(app_appearance) = NSAppearance::appearanceNamed(app_name) {
+            window.setAppearance(Some(&app_appearance));
+        }
+
         let bg =
             NSColor::colorWithSRGBRed_green_blue_alpha(colors.bg.0, colors.bg.1, colors.bg.2, 1.0);
         let fg =
@@ -334,6 +343,18 @@ pub fn run_editor(config: EditorConfig) -> EditorResult {
                     if has_ctrl && keycode == KEYCODE_T {
                         is_dark = !is_dark;
                         let c = theme_colors(is_dark);
+
+                        let toggle_app_name = if is_dark {
+                            NSAppearanceNameDarkAqua
+                        } else {
+                            NSAppearanceNameAqua
+                        };
+                        if let Some(toggle_appearance) =
+                            NSAppearance::appearanceNamed(toggle_app_name)
+                        {
+                            window_ref.setAppearance(Some(&toggle_appearance));
+                        }
+
                         let new_bg =
                             NSColor::colorWithSRGBRed_green_blue_alpha(c.bg.0, c.bg.1, c.bg.2, 1.0);
                         let new_fg =
