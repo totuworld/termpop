@@ -27,12 +27,14 @@
 - [x] 검증: 다른 앱에서 핫키 → 팝업 → 붙여넣기 확인
 
 ## Phase 4: 편의 기능
-- [ ] --initial, --title CLI 옵션
-- [ ] launchd plist 자동 생성 (daemon --install)
-- [ ] 설정 파일 (~/.config/termpop/config.toml)
-- [ ] 다크/라이트 모드 자동 대응
+- [x] --initial, --title CLI 옵션
+- [x] launchd plist 자동 생성 (daemon --install)
+- [x] 설정 파일 (~/.config/termpop/config.toml)
+- [x] 다크/라이트 모드 자동 대응
 
 ## Phase 5: UI/UX 폴리싱
 - [ ] 말풍선 스타일 윈도우 (둥근 모서리, 꼬리 장식, 그림자)
 - [ ] 커서 위치 기반 팝업 — 호출한 터미널의 커서 바로 위에 표시
 - [ ] 글자 크기 조정 옵션 (--font-size, 설정 파일, 강의/프레젠테이션 용도)
+- [ ] 엔터키로 줄 바꿈이 가능하다는 점 하단에 안내 추가
+- [ ] Cmd + Shift 눌러야 입력된다는 점 안내 추가

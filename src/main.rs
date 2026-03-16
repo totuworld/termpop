@@ -1,8 +1,10 @@
 mod cli;
 mod clipboard;
+mod config;
 mod daemon;
 mod editor;
 mod ipc;
+mod launchd;
 
 use clap::Parser;
 use cli::{Cli, Command};
@@ -11,6 +13,7 @@ use ipc::{Request, Response};
 
 fn main() {
     let cli = Cli::parse();
+    let cfg = config::load_config();
 
     match cli.command {
         None => {
@@ -21,22 +24,30 @@ fn main() {
                 let rt = tokio::runtime::Runtime::new().expect("failed to create tokio runtime");
                 let fallback_initial = initial.clone();
                 let fallback_title = title.clone();
+                let cfg_clone = cfg.clone();
                 rt.block_on(async {
                     match open_via_daemon(initial, title).await {
                         Ok(EditorResult::Submitted(text)) => print!("{}", text),
                         Ok(EditorResult::Cancelled) => std::process::exit(1),
                         Err(e) => {
                             eprintln!("daemon connection failed: {}, falling back to direct mode", e);
-                            run_direct(fallback_initial, fallback_title);
+                            run_direct(fallback_initial, fallback_title, &cfg_clone);
                         }
                     }
                 });
             } else {
-                run_direct(initial, title);
+                run_direct(initial, title, &cfg);
             }
         }
-        Some(Command::Daemon { install: _ }) => {
-            run_daemon();
+        Some(Command::Daemon { install }) => {
+            if install {
+                if let Err(e) = launchd::install_plist() {
+                    eprintln!("failed to install plist: {}", e);
+                    std::process::exit(1);
+                }
+                return;
+            }
+            run_daemon(&cfg);
         }
         Some(Command::Status) => {
             let rt = tokio::runtime::Runtime::new().expect("failed to create tokio runtime");
@@ -62,11 +73,20 @@ fn main() {
     }
 }
 
-fn run_daemon() {
-    use global_hotkey::hotkey::{Code, HotKey, Modifiers};
+fn run_daemon(cfg: &config::Config) {
+    use global_hotkey::hotkey::HotKey;
     use global_hotkey::{GlobalHotKeyEvent, GlobalHotKeyManager, HotKeyState};
     use objc2_app_kit::*;
     use objc2_foundation::*;
+
+    let (modifiers, code) = config::parse_hotkey(&cfg.hotkey).unwrap_or_else(|| {
+        eprintln!("invalid hotkey '{}', using default Cmd+Shift+I", cfg.hotkey);
+        config::parse_hotkey("Cmd+Shift+I").unwrap()
+    });
+
+    let editor_font_size = cfg.font_size;
+    let editor_width = cfg.window_width;
+    let editor_height = cfg.window_height;
 
     unsafe {
         let mtm = MainThreadMarker::new().expect("must be called from main thread");
@@ -74,9 +94,11 @@ fn run_daemon() {
         app.setActivationPolicy(NSApplicationActivationPolicy::Accessory);
 
         let manager = GlobalHotKeyManager::new().expect("failed to create hotkey manager");
-        let hotkey = HotKey::new(Some(Modifiers::SUPER | Modifiers::SHIFT), Code::KeyI);
-        manager.register(hotkey).expect("failed to register hotkey Cmd+Shift+I");
-        eprintln!("global hotkey registered: Cmd+Shift+I");
+        let hotkey = HotKey::new(Some(modifiers), code);
+        manager
+            .register(hotkey)
+            .unwrap_or_else(|e| panic!("failed to register hotkey '{}': {}", cfg.hotkey, e));
+        eprintln!("global hotkey registered: {}", cfg.hotkey);
 
         let hotkey_receiver = GlobalHotKeyEvent::receiver();
 
@@ -108,7 +130,12 @@ fn run_daemon() {
                 if hk_event.id == hotkey.id() && hk_event.state == HotKeyState::Pressed {
                     let previous_app = clipboard::get_frontmost_app();
 
-                    let config = EditorConfig::default();
+                    let config = EditorConfig {
+                        font_size: editor_font_size,
+                        width: editor_width,
+                        height: editor_height,
+                        ..Default::default()
+                    };
                     let result = editor::run_editor(config);
 
                     if let EditorResult::Submitted(text) = result {
@@ -129,11 +156,13 @@ fn run_daemon() {
     }
 }
 
-fn run_direct(initial: Option<String>, title: Option<String>) {
+fn run_direct(initial: Option<String>, title: Option<String>, cfg: &config::Config) {
     let config = EditorConfig {
         initial_text: initial.unwrap_or_default(),
         title: title.unwrap_or_else(|| "TermPop".to_string()),
-        ..Default::default()
+        font_size: cfg.font_size,
+        width: cfg.window_width,
+        height: cfg.window_height,
     };
 
     match editor::run_editor(config) {
