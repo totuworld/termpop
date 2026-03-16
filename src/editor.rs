@@ -34,6 +34,14 @@ const FONT_SIZE_MIN: f64 = 8.0;
 const FONT_SIZE_MAX: f64 = 72.0;
 const FONT_SIZE_STEP: f64 = 2.0;
 
+fn save_font_size(font_size: f64) {
+    let mut cfg = crate::config::load_config();
+    cfg.font_size = font_size;
+    if let Err(e) = crate::config::save_config(&cfg) {
+        eprintln!("failed to save font size: {}", e);
+    }
+}
+
 pub fn run_editor(config: EditorConfig) -> EditorResult {
     use objc2::rc::Retained;
     use objc2::MainThreadOnly;
@@ -155,7 +163,9 @@ pub fn run_editor(config: EditorConfig) -> EditorResult {
             NSSize::new(config.width - 16.0, hint_height),
         );
         let hint_label = NSTextField::wrappingLabelWithString(
-            &NSString::from_str("Enter: 줄바꿈  │  ⌘+Enter: 제출  │  Esc: 취소"),
+            &NSString::from_str(
+                "Enter: 줄바꿈  │  ⌘+Enter: 제출  │  Esc: 취소  │  ⌃+/⌃-: 글자 크기",
+            ),
             mtm,
         );
         hint_label.setFrame(hint_frame);
@@ -197,7 +207,9 @@ pub fn run_editor(config: EditorConfig) -> EditorResult {
         let hint_label_ref = hint_label.clone();
         let default_font_size = config.font_size;
         let mut current_font_size = config.font_size;
-        let hint_default = NSString::from_str("Enter: 줄바꿈  │  ⌘+Enter: 제출  │  Esc: 취소");
+        let hint_default = NSString::from_str(
+            "Enter: 줄바꿈  │  ⌘+Enter: 제출  │  Esc: 취소  │  ⌃+/⌃-: 글자 크기",
+        );
 
         loop {
             let event = app.nextEventMatchingMask_untilDate_inMode_dequeue(
@@ -238,6 +250,7 @@ pub fn run_editor(config: EditorConfig) -> EditorResult {
                             "폰트 크기: {:.0}pt",
                             current_font_size
                         )));
+                        save_font_size(current_font_size);
                         continue;
                     }
 
@@ -252,6 +265,7 @@ pub fn run_editor(config: EditorConfig) -> EditorResult {
                             "폰트 크기: {:.0}pt",
                             current_font_size
                         )));
+                        save_font_size(current_font_size);
                         continue;
                     }
 
@@ -266,6 +280,7 @@ pub fn run_editor(config: EditorConfig) -> EditorResult {
                             "폰트 크기: {:.0}pt (기본)",
                             current_font_size
                         )));
+                        save_font_size(current_font_size);
                         continue;
                     }
 

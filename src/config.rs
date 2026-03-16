@@ -56,6 +56,20 @@ pub fn load_config_from(path: &std::path::Path) -> Config {
     }
 }
 
+pub fn save_config(config: &Config) -> Result<(), std::io::Error> {
+    let path = config_path();
+    save_config_to(config, &path)
+}
+
+pub fn save_config_to(config: &Config, path: &std::path::Path) -> Result<(), std::io::Error> {
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    let content = toml::to_string_pretty(config)
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+    std::fs::write(path, content)
+}
+
 pub fn parse_config(content: &str) -> Config {
     toml::from_str(content).unwrap_or_default()
 }
@@ -244,5 +258,26 @@ window_height = 400.0
     #[test]
     fn parse_hotkey_invalid_key_returns_none() {
         assert_eq!(parse_hotkey("Cmd+1"), None);
+    }
+
+    #[test]
+    fn save_and_reload_config() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("termpop").join("config.toml");
+        let mut config = Config::default();
+        config.font_size = 32.0;
+        save_config_to(&config, &path).unwrap();
+        let loaded = load_config_from(&path);
+        assert_eq!(loaded.font_size, 32.0);
+        assert_eq!(loaded.hotkey, config.hotkey);
+    }
+
+    #[test]
+    fn save_creates_parent_dirs() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("deep").join("nested").join("config.toml");
+        let config = Config::default();
+        assert!(save_config_to(&config, &path).is_ok());
+        assert!(path.exists());
     }
 }

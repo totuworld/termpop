@@ -95,10 +95,6 @@ fn run_daemon(cfg: &config::Config) {
         config::parse_hotkey("Cmd+Shift+I").unwrap()
     });
 
-    let editor_font_size = cfg.font_size;
-    let editor_width = cfg.window_width;
-    let editor_height = cfg.window_height;
-
     unsafe {
         let mtm = MainThreadMarker::new().expect("must be called from main thread");
         let app = NSApplication::sharedApplication(mtm);
@@ -141,10 +137,11 @@ fn run_daemon(cfg: &config::Config) {
                 if hk_event.id == hotkey.id() && hk_event.state == HotKeyState::Pressed {
                     let previous_app = clipboard::get_frontmost_app();
 
+                    let fresh_cfg = config::load_config();
                     let config = EditorConfig {
-                        font_size: editor_font_size,
-                        width: editor_width,
-                        height: editor_height,
+                        font_size: fresh_cfg.font_size,
+                        width: fresh_cfg.window_width,
+                        height: fresh_cfg.window_height,
                         ..Default::default()
                     };
                     let result = editor::run_editor(config);
