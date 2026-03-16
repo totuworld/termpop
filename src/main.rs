@@ -142,6 +142,7 @@ fn run_daemon(cfg: &config::Config) {
                         font_size: fresh_cfg.font_size,
                         width: fresh_cfg.window_width,
                         height: fresh_cfg.window_height,
+                        theme: fresh_cfg.theme,
                         ..Default::default()
                     };
                     let result = editor::run_editor(config);
@@ -171,6 +172,7 @@ fn run_direct(initial: Option<String>, title: Option<String>, cfg: &config::Conf
         font_size: cfg.font_size,
         width: cfg.window_width,
         height: cfg.window_height,
+        theme: cfg.theme.clone(),
     };
 
     match editor::run_editor(config) {

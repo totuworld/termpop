@@ -11,6 +11,8 @@ pub struct Config {
     pub window_width: f64,
     #[serde(default = "default_height")]
     pub window_height: f64,
+    #[serde(default = "default_theme")]
+    pub theme: String,
 }
 
 fn default_hotkey() -> String {
@@ -25,6 +27,9 @@ fn default_width() -> f64 {
 fn default_height() -> f64 {
     300.0
 }
+fn default_theme() -> String {
+    "dark".to_string()
+}
 
 impl Default for Config {
     fn default() -> Self {
@@ -33,6 +38,7 @@ impl Default for Config {
             font_size: default_font_size(),
             window_width: default_width(),
             window_height: default_height(),
+            theme: default_theme(),
         }
     }
 }
@@ -142,6 +148,7 @@ mod tests {
         assert_eq!(config.font_size, 14.0);
         assert_eq!(config.window_width, 600.0);
         assert_eq!(config.window_height, 300.0);
+        assert_eq!(config.theme, "dark");
     }
 
     #[test]
@@ -279,5 +286,23 @@ window_height = 400.0
         let config = Config::default();
         assert!(save_config_to(&config, &path).is_ok());
         assert!(path.exists());
+    }
+
+    #[test]
+    fn parse_config_with_theme() {
+        let toml = r#"theme = "light""#;
+        let config = parse_config(toml);
+        assert_eq!(config.theme, "light");
+    }
+
+    #[test]
+    fn save_and_reload_theme() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("config.toml");
+        let mut config = Config::default();
+        config.theme = "light".to_string();
+        save_config_to(&config, &path).unwrap();
+        let loaded = load_config_from(&path);
+        assert_eq!(loaded.theme, "light");
     }
 }

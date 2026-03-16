@@ -11,6 +11,7 @@ pub struct EditorConfig {
     pub width: f64,
     pub height: f64,
     pub font_size: f64,
+    pub theme: String,
 }
 
 impl Default for EditorConfig {
@@ -21,6 +22,7 @@ impl Default for EditorConfig {
             width: 600.0,
             height: 300.0,
             font_size: 14.0,
+            theme: "dark".to_string(),
         }
     }
 }
@@ -30,15 +32,52 @@ const KEYCODE_ESCAPE: u16 = 53;
 const KEYCODE_EQUAL: u16 = 0x18;
 const KEYCODE_MINUS: u16 = 0x1B;
 const KEYCODE_ZERO: u16 = 0x1D;
+const KEYCODE_T: u16 = 0x11;
 const FONT_SIZE_MIN: f64 = 8.0;
 const FONT_SIZE_MAX: f64 = 72.0;
 const FONT_SIZE_STEP: f64 = 2.0;
+
+struct ThemeColors {
+    bg: (f64, f64, f64),
+    fg: (f64, f64, f64),
+    hint: (f64, f64, f64),
+    cursor: (f64, f64, f64),
+    border: (f64, f64, f64),
+}
+
+fn theme_colors(is_dark: bool) -> ThemeColors {
+    if is_dark {
+        ThemeColors {
+            bg: (0.157, 0.173, 0.204),
+            fg: (0.671, 0.698, 0.749),
+            hint: (0.361, 0.388, 0.439),
+            cursor: (0.322, 0.545, 1.0),
+            border: (0.094, 0.102, 0.122),
+        }
+    } else {
+        ThemeColors {
+            bg: (0.98, 0.98, 0.98),
+            fg: (0.220, 0.227, 0.259),
+            hint: (0.627, 0.631, 0.655),
+            cursor: (0.322, 0.435, 1.0),
+            border: (0.859, 0.859, 0.863),
+        }
+    }
+}
 
 fn save_font_size(font_size: f64) {
     let mut cfg = crate::config::load_config();
     cfg.font_size = font_size;
     if let Err(e) = crate::config::save_config(&cfg) {
         eprintln!("failed to save font size: {}", e);
+    }
+}
+
+fn save_theme(theme: &str) {
+    let mut cfg = crate::config::load_config();
+    cfg.theme = theme.to_string();
+    if let Err(e) = crate::config::save_config(&cfg) {
+        eprintln!("failed to save theme: {}", e);
     }
 }
 
@@ -116,25 +155,24 @@ pub fn run_editor(config: EditorConfig) -> EditorResult {
         let font = NSFont::monospacedSystemFontOfSize_weight(config.font_size, NSFontWeightRegular);
         text_view.setFont(Some(&font));
 
-        let appearance = NSApplication::sharedApplication(mtm).effectiveAppearance();
-        let appearance_name = appearance.name();
-        let is_dark = appearance_name.to_string().contains("Dark");
+        let mut is_dark = config.theme != "light";
+        let colors = theme_colors(is_dark);
 
-        if is_dark {
-            let bg = NSColor::colorWithSRGBRed_green_blue_alpha(0.15, 0.15, 0.15, 1.0);
-            let fg = NSColor::colorWithSRGBRed_green_blue_alpha(0.93, 0.93, 0.93, 1.0);
-            window.setBackgroundColor(Some(&bg));
-            text_view.setBackgroundColor(&bg);
-            text_view.setTextColor(Some(&fg));
-            text_view.setInsertionPointColor(Some(&fg));
-        } else {
-            let bg = NSColor::colorWithSRGBRed_green_blue_alpha(1.0, 1.0, 1.0, 1.0);
-            let fg = NSColor::colorWithSRGBRed_green_blue_alpha(0.1, 0.1, 0.1, 1.0);
-            window.setBackgroundColor(Some(&bg));
-            text_view.setBackgroundColor(&bg);
-            text_view.setTextColor(Some(&fg));
-            text_view.setInsertionPointColor(Some(&fg));
-        }
+        let bg =
+            NSColor::colorWithSRGBRed_green_blue_alpha(colors.bg.0, colors.bg.1, colors.bg.2, 1.0);
+        let fg =
+            NSColor::colorWithSRGBRed_green_blue_alpha(colors.fg.0, colors.fg.1, colors.fg.2, 1.0);
+        let cursor_color = NSColor::colorWithSRGBRed_green_blue_alpha(
+            colors.cursor.0,
+            colors.cursor.1,
+            colors.cursor.2,
+            1.0,
+        );
+
+        window.setBackgroundColor(Some(&bg));
+        text_view.setBackgroundColor(&bg);
+        text_view.setTextColor(Some(&fg));
+        text_view.setInsertionPointColor(Some(&cursor_color));
 
         if !config.initial_text.is_empty() {
             text_view.setString(&NSString::from_str(&config.initial_text));
@@ -164,7 +202,7 @@ pub fn run_editor(config: EditorConfig) -> EditorResult {
         );
         let hint_label = NSTextField::wrappingLabelWithString(
             &NSString::from_str(
-                "Enter: 줄바꿈  │  ⌘+Enter: 제출  │  Esc: 취소  │  ⌃+/⌃-: 글자 크기",
+                "Enter: 줄바꿈  │  ⌘+Enter: 제출  │  Esc: 취소  │  ⌃+/⌃-: 글자 크기  │  ⌃T: 테마",
             ),
             mtm,
         );
@@ -177,13 +215,13 @@ pub fn run_editor(config: EditorConfig) -> EditorResult {
         let hint_font = NSFont::systemFontOfSize(11.0);
         hint_label.setFont(Some(&hint_font));
 
-        if is_dark {
-            let hint_color = NSColor::colorWithSRGBRed_green_blue_alpha(0.6, 0.6, 0.6, 1.0);
-            hint_label.setTextColor(Some(&hint_color));
-        } else {
-            let hint_color = NSColor::colorWithSRGBRed_green_blue_alpha(0.5, 0.5, 0.5, 1.0);
-            hint_label.setTextColor(Some(&hint_color));
-        }
+        let hint_color = NSColor::colorWithSRGBRed_green_blue_alpha(
+            colors.hint.0,
+            colors.hint.1,
+            colors.hint.2,
+            1.0,
+        );
+        hint_label.setTextColor(Some(&hint_color));
 
         hint_label.setAutoresizingMask(NSAutoresizingMaskOptions::ViewWidthSizable);
 
@@ -194,6 +232,14 @@ pub fn run_editor(config: EditorConfig) -> EditorResult {
         if let Some(layer) = container.layer() {
             layer.setCornerRadius(12.0);
             layer.setMasksToBounds(true);
+            layer.setBorderWidth(1.5);
+            let border_ns = NSColor::colorWithSRGBRed_green_blue_alpha(
+                colors.border.0,
+                colors.border.1,
+                colors.border.2,
+                1.0,
+            );
+            layer.setBorderColor(Some(&border_ns.CGColor()));
         }
 
         window.setContentView(Some(&container));
@@ -205,10 +251,11 @@ pub fn run_editor(config: EditorConfig) -> EditorResult {
         let text_view_ref = text_view.clone();
         let window_ref = window.clone();
         let hint_label_ref = hint_label.clone();
+        let container_ref = container.clone();
         let default_font_size = config.font_size;
         let mut current_font_size = config.font_size;
         let hint_default = NSString::from_str(
-            "Enter: 줄바꿈  │  ⌘+Enter: 제출  │  Esc: 취소  │  ⌃+/⌃-: 글자 크기",
+            "Enter: 줄바꿈  │  ⌘+Enter: 제출  │  Esc: 취소  │  ⌃+/⌃-: 글자 크기  │  ⌃T: 테마",
         );
 
         loop {
@@ -281,6 +328,40 @@ pub fn run_editor(config: EditorConfig) -> EditorResult {
                             current_font_size
                         )));
                         save_font_size(current_font_size);
+                        continue;
+                    }
+
+                    if has_ctrl && keycode == KEYCODE_T {
+                        is_dark = !is_dark;
+                        let c = theme_colors(is_dark);
+                        let new_bg =
+                            NSColor::colorWithSRGBRed_green_blue_alpha(c.bg.0, c.bg.1, c.bg.2, 1.0);
+                        let new_fg =
+                            NSColor::colorWithSRGBRed_green_blue_alpha(c.fg.0, c.fg.1, c.fg.2, 1.0);
+                        let new_cursor = NSColor::colorWithSRGBRed_green_blue_alpha(
+                            c.cursor.0, c.cursor.1, c.cursor.2, 1.0,
+                        );
+                        let new_hint = NSColor::colorWithSRGBRed_green_blue_alpha(
+                            c.hint.0, c.hint.1, c.hint.2, 1.0,
+                        );
+                        let new_border = NSColor::colorWithSRGBRed_green_blue_alpha(
+                            c.border.0, c.border.1, c.border.2, 1.0,
+                        );
+
+                        window_ref.setBackgroundColor(Some(&new_bg));
+                        text_view_ref.setBackgroundColor(&new_bg);
+                        text_view_ref.setTextColor(Some(&new_fg));
+                        text_view_ref.setInsertionPointColor(Some(&new_cursor));
+                        hint_label_ref.setTextColor(Some(&new_hint));
+
+                        if let Some(layer) = container_ref.layer() {
+                            layer.setBorderColor(Some(&new_border.CGColor()));
+                        }
+
+                        let theme_name = if is_dark { "dark" } else { "light" };
+                        hint_label_ref
+                            .setStringValue(&NSString::from_str(&format!("테마: {}", theme_name)));
+                        save_theme(theme_name);
                         continue;
                     }
 
