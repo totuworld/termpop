@@ -45,15 +45,35 @@ pub fn install_plist() -> Result<(), Box<dyn std::error::Error>> {
 
     std::fs::write(&path, &plist_content)?;
     eprintln!("plist installed: {:?}", path);
-    eprintln!("run: launchctl load {:?}", path);
+
+    let path_str = path.to_str().ok_or("invalid plist path")?;
+    let status = std::process::Command::new("launchctl")
+        .args(["load", path_str])
+        .status()?;
+
+    if status.success() {
+        eprintln!("daemon started via launchctl");
+    } else {
+        eprintln!(
+            "launchctl load failed (exit {}), run manually: launchctl load {:?}",
+            status.code().unwrap_or(-1),
+            path
+        );
+    }
+
     Ok(())
 }
 
 pub fn uninstall_plist() -> Result<(), Box<dyn std::error::Error>> {
     let path = plist_path();
     if path.exists() {
+        let path_str = path.to_str().ok_or("invalid plist path")?;
+        let _ = std::process::Command::new("launchctl")
+            .args(["unload", path_str])
+            .status();
+
         std::fs::remove_file(&path)?;
-        eprintln!("plist removed: {:?}", path);
+        eprintln!("daemon stopped and plist removed: {:?}", path);
     } else {
         eprintln!("plist not found: {:?}", path);
     }
