@@ -1,4 +1,5 @@
 mod cli;
+mod clipboard;
 mod daemon;
 mod editor;
 mod ipc;
@@ -62,6 +63,16 @@ fn main() {
 }
 
 fn run_daemon() {
+    use global_hotkey::hotkey::{Code, HotKey, Modifiers};
+    use global_hotkey::{GlobalHotKeyEvent, GlobalHotKeyManager, HotKeyState};
+
+    let manager = GlobalHotKeyManager::new().expect("failed to create hotkey manager");
+    let hotkey = HotKey::new(Some(Modifiers::SUPER | Modifiers::SHIFT), Code::KeyE);
+    manager.register(hotkey).expect("failed to register hotkey Cmd+Shift+E");
+    eprintln!("global hotkey registered: Cmd+Shift+E");
+
+    let hotkey_receiver = GlobalHotKeyEvent::receiver();
+
     let (editor_tx, mut editor_rx) = tokio::sync::mpsc::channel::<daemon::EditorRequest>(1);
     let (shutdown_tx, mut shutdown_rx) = tokio::sync::mpsc::channel::<()>(1);
 
@@ -75,6 +86,19 @@ fn run_daemon() {
     });
 
     loop {
+        if let Ok(event) = hotkey_receiver.try_recv() {
+            if event.id == hotkey.id() && event.state == HotKeyState::Pressed {
+                let previous_app = clipboard::get_frontmost_app();
+
+                let config = EditorConfig::default();
+                let result = editor::run_editor(config);
+
+                if let EditorResult::Submitted(text) = result {
+                    clipboard::paste_text_and_restore(&text, previous_app.as_deref());
+                }
+            }
+        }
+
         if let Ok(req) = editor_rx.try_recv() {
             let result = editor::run_editor(req.config);
             let _ = req.respond.send(result);

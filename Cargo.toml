@@ -23,12 +23,16 @@ objc2-app-kit = { version = "0.3", features = [
     "NSRunningApplication",
     "NSGraphics",
     "NSEvent",
+    "NSPasteboard",
+    "NSWorkspace",
 ] }
 clap = { version = "4", features = ["derive"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tokio = { version = "1", features = ["rt", "rt-multi-thread", "net", "io-util", "macros", "sync"] }
 dirs = "6"
+global-hotkey = "0.7"
+core-graphics = "0.24"
 
 [dev-dependencies]
 tempfile = "3"
