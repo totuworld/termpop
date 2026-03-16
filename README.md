@@ -82,6 +82,32 @@ termpop stop
 2. 텍스트 작성 후 ⌘+Enter로 제출
 3. 결과가 클립보드에 복사되고 이전 앱에 자동 붙여넣기
 
+### 데몬 자동 시작
+
+글로벌 핫키를 사용하려면 데몬이 실행 중이어야 합니다. 매번 수동으로 띄우기 번거로우니 자동 시작을 설정하세요.
+
+#### 방법 1: launchd (시스템 레벨)
+
+```bash
+termpop daemon --install
+```
+
+macOS 로그인 시 자동으로 데몬이 시작됩니다. 해제하려면 `termpop daemon --uninstall`.
+
+#### 방법 2: .zshrc (셸 레벨)
+
+`~/.zshrc` (또는 `~/.bashrc`)에 다음을 추가합니다:
+
+```bash
+# TermPop 데몬 자동 시작
+if ! termpop status &>/dev/null; then
+  termpop daemon &>/dev/null &
+  disown
+fi
+```
+
+터미널을 열 때 데몬이 꺼져 있으면 자동으로 백그라운드에서 시작합니다.
+
 ## 단축키
 
 | 키 | 동작 |
