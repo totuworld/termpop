@@ -46,3 +46,11 @@
 - [x] Atom One Dark/Light 컬러 팔레트 적용 (다크 기본)
 - [x] 테두리(border) 추가
 - [x] Ctrl+T로 다크/라이트 테마 즉시 토글 + config 저장
+- [x] 다크 테마 스크롤바 색상 수정 (NSAppearance 적용)
+- [x] daemon --install 시 launchctl load 자동 실행
+- [x] daemon --uninstall 시 launchctl unload 자동 실행
+
+## Phase 6: 문서화
+- [x] README.md 작성 (소개, 설치, 사용법, 단축키, 설정, 아키텍처)
+- [x] DISTRIBUTION.md 작성 (배포 전략 가이드)
+- [x] 데몬 자동 시작 안내 (launchd + .zshrc)
