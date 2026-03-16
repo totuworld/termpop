@@ -65,50 +65,67 @@ fn main() {
 fn run_daemon() {
     use global_hotkey::hotkey::{Code, HotKey, Modifiers};
     use global_hotkey::{GlobalHotKeyEvent, GlobalHotKeyManager, HotKeyState};
+    use objc2_app_kit::*;
+    use objc2_foundation::*;
 
-    let manager = GlobalHotKeyManager::new().expect("failed to create hotkey manager");
-    let hotkey = HotKey::new(Some(Modifiers::SUPER | Modifiers::SHIFT), Code::KeyE);
-    manager.register(hotkey).expect("failed to register hotkey Cmd+Shift+E");
-    eprintln!("global hotkey registered: Cmd+Shift+E");
+    unsafe {
+        let mtm = MainThreadMarker::new().expect("must be called from main thread");
+        let app = NSApplication::sharedApplication(mtm);
+        app.setActivationPolicy(NSApplicationActivationPolicy::Accessory);
 
-    let hotkey_receiver = GlobalHotKeyEvent::receiver();
+        let manager = GlobalHotKeyManager::new().expect("failed to create hotkey manager");
+        let hotkey = HotKey::new(Some(Modifiers::SUPER | Modifiers::SHIFT), Code::KeyI);
+        manager.register(hotkey).expect("failed to register hotkey Cmd+Shift+I");
+        eprintln!("global hotkey registered: Cmd+Shift+I");
 
-    let (editor_tx, mut editor_rx) = tokio::sync::mpsc::channel::<daemon::EditorRequest>(1);
-    let (shutdown_tx, mut shutdown_rx) = tokio::sync::mpsc::channel::<()>(1);
+        let hotkey_receiver = GlobalHotKeyEvent::receiver();
 
-    std::thread::spawn(move || {
-        let rt = tokio::runtime::Runtime::new().expect("failed to create tokio runtime");
-        rt.block_on(async {
-            if let Err(e) = daemon::run_socket_server(editor_tx, shutdown_tx).await {
-                eprintln!("daemon error: {}", e);
-            }
+        let (editor_tx, mut editor_rx) = tokio::sync::mpsc::channel::<daemon::EditorRequest>(1);
+        let (shutdown_tx, mut shutdown_rx) = tokio::sync::mpsc::channel::<()>(1);
+
+        std::thread::spawn(move || {
+            let rt = tokio::runtime::Runtime::new().expect("failed to create tokio runtime");
+            rt.block_on(async {
+                if let Err(e) = daemon::run_socket_server(editor_tx, shutdown_tx).await {
+                    eprintln!("daemon error: {}", e);
+                }
+            });
         });
-    });
 
-    loop {
-        if let Ok(event) = hotkey_receiver.try_recv() {
-            if event.id == hotkey.id() && event.state == HotKeyState::Pressed {
-                let previous_app = clipboard::get_frontmost_app();
+        loop {
+            let event = app.nextEventMatchingMask_untilDate_inMode_dequeue(
+                NSEventMask::Any,
+                Some(&NSDate::dateWithTimeIntervalSinceNow(0.05)),
+                NSDefaultRunLoopMode,
+                true,
+            );
 
-                let config = EditorConfig::default();
-                let result = editor::run_editor(config);
+            if let Some(ref event) = event {
+                app.sendEvent(event);
+            }
 
-                if let EditorResult::Submitted(text) = result {
-                    clipboard::paste_text_and_restore(&text, previous_app.as_deref());
+            if let Ok(hk_event) = hotkey_receiver.try_recv() {
+                if hk_event.id == hotkey.id() && hk_event.state == HotKeyState::Pressed {
+                    let previous_app = clipboard::get_frontmost_app();
+
+                    let config = EditorConfig::default();
+                    let result = editor::run_editor(config);
+
+                    if let EditorResult::Submitted(text) = result {
+                        clipboard::paste_text_and_restore(&text, previous_app.as_deref());
+                    }
                 }
             }
-        }
 
-        if let Ok(req) = editor_rx.try_recv() {
-            let result = editor::run_editor(req.config);
-            let _ = req.respond.send(result);
-        }
+            if let Ok(req) = editor_rx.try_recv() {
+                let result = editor::run_editor(req.config);
+                let _ = req.respond.send(result);
+            }
 
-        if shutdown_rx.try_recv().is_ok() {
-            break;
+            if shutdown_rx.try_recv().is_ok() {
+                break;
+            }
         }
-
-        std::thread::sleep(std::time::Duration::from_millis(50));
     }
 }
 
