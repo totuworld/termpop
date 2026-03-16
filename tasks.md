@@ -10,13 +10,13 @@
 - [x] editor.rs — NSWindow + NSTextView 팝업 생성
 - [x] 키 바인딩 (Cmd+Enter 제출, Escape 취소)
 - [x] main.rs — 팝업 열고 결과 stdout 출력 / 취소 시 exit 1
-- [ ] 검증: `result=$(cargo run) && echo "$result"`
+- [x] 검증: `result=$(cargo run) && echo "$result"`
 
 ## Phase 2: 데몬 + IPC
-- [ ] ipc.rs — Request/Response enum + 소켓 프로토콜 (4byte 길이 + JSON)
-- [ ] daemon.rs — tokio Unix socket 서버 + NSApp 이벤트 루프
-- [ ] CLI에서 소켓 존재 시 데몬 연결, 없으면 직접 팝업
-- [ ] `termpop daemon` / `termpop status` / `termpop stop` 명령어
+- [x] ipc.rs — Request/Response enum + 소켓 프로토콜 (4byte 길이 + JSON)
+- [x] daemon.rs — tokio Unix socket 서버 + NSApp 이벤트 루프
+- [x] CLI에서 소켓 존재 시 데몬 연결, 없으면 직접 팝업
+- [x] `termpop daemon` / `termpop status` / `termpop stop` 명령어
 - [ ] 검증: 데몬 띄운 후 CLI로 소켓 통신 확인
 
 ## Phase 3: 글로벌 핫키 + 붙여넣기
