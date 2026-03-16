@@ -21,6 +21,8 @@ pub enum Command {
     Daemon {
         #[arg(long)]
         install: bool,
+        #[arg(long)]
+        uninstall: bool,
     },
     Status,
     Stop,
@@ -56,7 +58,10 @@ mod tests {
         let cli = Cli::parse_from(["termpop", "daemon"]);
         assert!(matches!(
             cli.command,
-            Some(Command::Daemon { install: false })
+            Some(Command::Daemon {
+                install: false,
+                uninstall: false
+            })
         ));
     }
 
@@ -65,7 +70,22 @@ mod tests {
         let cli = Cli::parse_from(["termpop", "daemon", "--install"]);
         assert!(matches!(
             cli.command,
-            Some(Command::Daemon { install: true })
+            Some(Command::Daemon {
+                install: true,
+                uninstall: false
+            })
+        ));
+    }
+
+    #[test]
+    fn parse_daemon_uninstall() {
+        let cli = Cli::parse_from(["termpop", "daemon", "--uninstall"]);
+        assert!(matches!(
+            cli.command,
+            Some(Command::Daemon {
+                install: false,
+                uninstall: true
+            })
         ));
     }
 

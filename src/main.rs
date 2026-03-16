@@ -43,10 +43,17 @@ fn main() {
                 run_direct(initial, title, &cfg);
             }
         }
-        Some(Command::Daemon { install }) => {
+        Some(Command::Daemon { install, uninstall }) => {
             if install {
                 if let Err(e) = launchd::install_plist() {
                     eprintln!("failed to install plist: {}", e);
+                    std::process::exit(1);
+                }
+                return;
+            }
+            if uninstall {
+                if let Err(e) = launchd::uninstall_plist() {
+                    eprintln!("failed to uninstall plist: {}", e);
                     std::process::exit(1);
                 }
                 return;
