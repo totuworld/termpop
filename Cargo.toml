@@ -1,0 +1,27 @@
+[package]
+name = "termpop"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+objc2 = "0.6"
+objc2-foundation = { version = "0.3", features = ["NSString", "NSObject", "NSThread", "NSObjCRuntime", "NSDate"] }
+objc2-app-kit = { version = "0.3", features = [
+    "NSApplication",
+    "NSWindow",
+    "NSView",
+    "NSTextView",
+    "NSText",
+    "NSScrollView",
+    "NSButton",
+    "NSControl",
+    "NSFont",
+    "NSFontDescriptor",
+    "NSColor",
+    "NSScreen",
+    "NSResponder",
+    "NSRunningApplication",
+    "NSGraphics",
+    "NSEvent",
+] }
+clap = { version = "4", features = ["derive"] }
