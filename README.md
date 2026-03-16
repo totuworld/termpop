@@ -1,0 +1,133 @@
+# TermPop
+
+터미널에서 호출하는 네이티브 macOS 팝업 텍스트 에디터.
+
+AI 프롬프트, 커밋 메시지, 복잡한 명령어 등 여러 줄 텍스트를 터미널에서 편하게 작성하고 stdout으로 받거나, 글로벌 핫키로 어디서든 호출해서 바로 붙여넣기까지.
+
+```
+┌─────────────────────────────────────────┐
+│                                         │
+│  여기에 텍스트를 입력하세요...            │
+│                                         │
+│  Enter: 줄바꿈 │ ⌘+Enter: 제출 │ Esc: 취소 │
+└─────────────────────────────────────────┘
+```
+
+## 특징
+
+- Atom One Dark/Light 테마 (⌃T로 즉시 전환)
+- 모노스페이스 폰트, 둥근 모서리, 테두리
+- 커서 위치에 팝업 표시
+- 데몬 모드 — 글로벌 핫키로 어디서든 호출
+- 결과를 클립보드에 복사 후 자동 붙여넣기 (Cmd+V 시뮬레이션)
+- 이전 앱 포커스 자동 복원
+- 설정 파일로 핫키, 폰트 크기, 테마 등 커스터마이징
+- 변경한 폰트 크기와 테마는 자동 저장
+
+## 설치
+
+### 소스에서 빌드
+
+```bash
+# 필수: macOS 10.13+, Rust 1.70+, Xcode Command Line Tools
+git clone https://github.com/totuworld/text-bubble.git
+cd text-bubble
+cargo build --release
+cp target/release/termpop /usr/local/bin/
+```
+
+### cargo install
+
+```bash
+cargo install --path .
+```
+
+## 사용법
+
+### 기본 — 팝업 열고 결과 받기
+
+```bash
+# 팝업 열기, 제출하면 stdout으로 출력
+result=$(termpop)
+echo "$result"
+
+# 초기 텍스트와 제목 지정
+termpop --initial "기존 텍스트" --title "커밋 메시지"
+
+# 폰트 크기 지정
+termpop --font-size 20
+```
+
+### 데몬 모드 — 글로벌 핫키
+
+```bash
+# 데몬 시작 (기본 핫키: Cmd+Shift+I)
+termpop daemon
+
+# 로그인 시 자동 시작 등록
+termpop daemon --install
+
+# 자동 시작 해제
+termpop daemon --uninstall
+
+# 상태 확인
+termpop status
+
+# 데몬 종료
+termpop stop
+```
+
+데몬 모드에서 핫키를 누르면:
+1. 팝업이 열림
+2. 텍스트 작성 후 ⌘+Enter로 제출
+3. 결과가 클립보드에 복사되고 이전 앱에 자동 붙여넣기
+
+## 단축키
+
+| 키 | 동작 |
+|---|---|
+| `Enter` | 줄바꿈 |
+| `⌘+Enter` | 제출 |
+| `Esc` | 취소 |
+| `⌃+` | 폰트 크기 증가 |
+| `⌃-` | 폰트 크기 감소 |
+| `⌃0` | 폰트 크기 기본값 복원 |
+| `⌃T` | 다크/라이트 테마 전환 |
+
+## 설정
+
+`~/.config/termpop/config.toml`
+
+```toml
+hotkey = "Cmd+Shift+I"
+font_size = 14.0
+window_width = 600.0
+window_height = 300.0
+theme = "dark"
+```
+
+폰트 크기와 테마는 팝업 안에서 변경하면 자동으로 저장됩니다.
+
+## 아키텍처
+
+```
+src/
+├── main.rs        # 엔트리포인트, CLI 라우팅
+├── cli.rs         # clap 기반 CLI 파싱
+├── editor.rs      # NSWindow + NSTextView 네이티브 UI
+├── daemon.rs      # tokio Unix socket 서버 + 이벤트 루프
+├── ipc.rs         # 4byte 길이 + JSON 프로토콜
+├── clipboard.rs   # 클립보드 저장/복원 + CGEvent 붙여넣기
+├── config.rs      # TOML 설정 파일 관리
+└── launchd.rs     # launchd plist 생성/제거
+```
+
+## 권한
+
+데몬 모드에서 글로벌 핫키와 자동 붙여넣기를 사용하려면 macOS 접근성 권한이 필요합니다.
+
+시스템 설정 → 개인정보 보호 및 보안 → 접근성 → termpop 허용
+
+## 라이선스
+
+MIT
