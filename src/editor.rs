@@ -27,6 +27,12 @@ impl Default for EditorConfig {
 
 const KEYCODE_RETURN: u16 = 36;
 const KEYCODE_ESCAPE: u16 = 53;
+const KEYCODE_EQUAL: u16 = 0x18;
+const KEYCODE_MINUS: u16 = 0x1B;
+const KEYCODE_ZERO: u16 = 0x1D;
+const FONT_SIZE_MIN: f64 = 8.0;
+const FONT_SIZE_MAX: f64 = 72.0;
+const FONT_SIZE_STEP: f64 = 2.0;
 
 pub fn run_editor(config: EditorConfig) -> EditorResult {
     use objc2::rc::Retained;
@@ -188,6 +194,10 @@ pub fn run_editor(config: EditorConfig) -> EditorResult {
 
         let text_view_ref = text_view.clone();
         let window_ref = window.clone();
+        let hint_label_ref = hint_label.clone();
+        let default_font_size = config.font_size;
+        let mut current_font_size = config.font_size;
+        let hint_default = NSString::from_str("Enter: 줄바꿈  │  ⌘+Enter: 제출  │  Esc: 취소");
 
         loop {
             let event = app.nextEventMatchingMask_untilDate_inMode_dequeue(
@@ -202,9 +212,9 @@ pub fn run_editor(config: EditorConfig) -> EditorResult {
 
                 if event_type == NSEventType::KeyDown {
                     let keycode = event.keyCode();
-                    let has_cmd = event
-                        .modifierFlags()
-                        .contains(NSEventModifierFlags::Command);
+                    let flags = event.modifierFlags();
+                    let has_cmd = flags.contains(NSEventModifierFlags::Command);
+                    let has_ctrl = flags.contains(NSEventModifierFlags::Control);
 
                     if has_cmd && keycode == KEYCODE_RETURN {
                         let text = text_view_ref.string().to_string();
@@ -216,6 +226,50 @@ pub fn run_editor(config: EditorConfig) -> EditorResult {
                         window_ref.close();
                         return EditorResult::Cancelled;
                     }
+
+                    if has_ctrl && keycode == KEYCODE_EQUAL {
+                        current_font_size = (current_font_size + FONT_SIZE_STEP).min(FONT_SIZE_MAX);
+                        let new_font = NSFont::monospacedSystemFontOfSize_weight(
+                            current_font_size,
+                            NSFontWeightRegular,
+                        );
+                        text_view_ref.setFont(Some(&new_font));
+                        hint_label_ref.setStringValue(&NSString::from_str(&format!(
+                            "폰트 크기: {:.0}pt",
+                            current_font_size
+                        )));
+                        continue;
+                    }
+
+                    if has_ctrl && keycode == KEYCODE_MINUS {
+                        current_font_size = (current_font_size - FONT_SIZE_STEP).max(FONT_SIZE_MIN);
+                        let new_font = NSFont::monospacedSystemFontOfSize_weight(
+                            current_font_size,
+                            NSFontWeightRegular,
+                        );
+                        text_view_ref.setFont(Some(&new_font));
+                        hint_label_ref.setStringValue(&NSString::from_str(&format!(
+                            "폰트 크기: {:.0}pt",
+                            current_font_size
+                        )));
+                        continue;
+                    }
+
+                    if has_ctrl && keycode == KEYCODE_ZERO {
+                        current_font_size = default_font_size;
+                        let new_font = NSFont::monospacedSystemFontOfSize_weight(
+                            current_font_size,
+                            NSFontWeightRegular,
+                        );
+                        text_view_ref.setFont(Some(&new_font));
+                        hint_label_ref.setStringValue(&NSString::from_str(&format!(
+                            "폰트 크기: {:.0}pt (기본)",
+                            current_font_size
+                        )));
+                        continue;
+                    }
+
+                    hint_label_ref.setStringValue(&hint_default);
                 }
 
                 if event_type == NSEventType::AppKitDefined && !window_ref.isVisible() {
@@ -279,5 +333,26 @@ mod tests {
             ..Default::default()
         };
         assert_eq!(config.font_size, 24.0);
+    }
+
+    #[test]
+    fn font_size_bounds() {
+        assert!(FONT_SIZE_MIN > 0.0);
+        assert!(FONT_SIZE_MAX > FONT_SIZE_MIN);
+        assert!(FONT_SIZE_STEP > 0.0);
+    }
+
+    #[test]
+    fn font_size_increase_clamped() {
+        let size = FONT_SIZE_MAX;
+        let new_size = (size + FONT_SIZE_STEP).min(FONT_SIZE_MAX);
+        assert_eq!(new_size, FONT_SIZE_MAX);
+    }
+
+    #[test]
+    fn font_size_decrease_clamped() {
+        let size = FONT_SIZE_MIN;
+        let new_size = (size - FONT_SIZE_STEP).max(FONT_SIZE_MIN);
+        assert_eq!(new_size, FONT_SIZE_MIN);
     }
 }
