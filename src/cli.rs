@@ -11,6 +11,9 @@ pub struct Cli {
 
     #[arg(long)]
     pub title: Option<String>,
+
+    #[arg(long)]
+    pub font_size: Option<f64>,
 }
 
 #[derive(Subcommand, Debug)]
@@ -33,6 +36,7 @@ mod tests {
         assert!(cli.command.is_none());
         assert!(cli.initial.is_none());
         assert!(cli.title.is_none());
+        assert!(cli.font_size.is_none());
     }
 
     #[test]
@@ -75,5 +79,11 @@ mod tests {
     fn parse_stop_command() {
         let cli = Cli::parse_from(["termpop", "stop"]);
         assert!(matches!(cli.command, Some(Command::Stop)));
+    }
+
+    #[test]
+    fn parse_font_size() {
+        let cli = Cli::parse_from(["termpop", "--font-size", "24"]);
+        assert_eq!(cli.font_size, Some(24.0));
     }
 }

@@ -13,7 +13,11 @@ use ipc::{Request, Response};
 
 fn main() {
     let cli = Cli::parse();
-    let cfg = config::load_config();
+    let mut cfg = config::load_config();
+
+    if let Some(fs) = cli.font_size {
+        cfg.font_size = fs;
+    }
 
     match cli.command {
         None => {

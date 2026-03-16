@@ -12,6 +12,7 @@ objc2-app-kit = { version = "0.3", features = [
     "NSView",
     "NSTextView",
     "NSText",
+    "NSTextField",
     "NSScrollView",
     "NSButton",
     "NSControl",
@@ -32,6 +33,7 @@ serde_json = "1"
 tokio = { version = "1", features = ["rt", "rt-multi-thread", "net", "io-util", "macros", "sync"] }
 dirs = "6"
 toml = "0.8"
+objc2-quartz-core = { version = "0.3", features = ["CALayer"] }
 global-hotkey = "0.7"
 core-graphics = "0.24"
 

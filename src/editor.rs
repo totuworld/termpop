@@ -40,8 +40,10 @@ pub fn run_editor(config: EditorConfig) -> EditorResult {
         let app = NSApplication::sharedApplication(mtm);
         app.setActivationPolicy(NSApplicationActivationPolicy::Accessory);
 
-        let style =
-            NSWindowStyleMask::Titled | NSWindowStyleMask::Closable | NSWindowStyleMask::Resizable;
+        let style = NSWindowStyleMask::Titled
+            | NSWindowStyleMask::Closable
+            | NSWindowStyleMask::Resizable
+            | NSWindowStyleMask::FullSizeContentView;
 
         let frame = NSRect::new(
             NSPoint::new(0.0, 0.0),
@@ -57,8 +59,38 @@ pub fn run_editor(config: EditorConfig) -> EditorResult {
         );
 
         window.setTitle(&NSString::from_str(&config.title));
+        window.setTitleVisibility(NSWindowTitleVisibility::Hidden);
+        window.setTitlebarAppearsTransparent(true);
         window.setLevel(NSFloatingWindowLevel);
-        window.center();
+        window.setHasShadow(true);
+        window.setOpaque(false);
+
+        let mouse_pos = NSEvent::mouseLocation();
+        let top_left = NSPoint::new(mouse_pos.x, mouse_pos.y);
+        window.setFrameTopLeftPoint(top_left);
+
+        if let Some(screen) = NSScreen::mainScreen(mtm) {
+            let screen_frame = screen.visibleFrame();
+            let win_frame = window.frame();
+
+            let mut x = win_frame.origin.x;
+            let mut y = win_frame.origin.y;
+
+            if x + win_frame.size.width > screen_frame.origin.x + screen_frame.size.width {
+                x = screen_frame.origin.x + screen_frame.size.width - win_frame.size.width;
+            }
+            if x < screen_frame.origin.x {
+                x = screen_frame.origin.x;
+            }
+            if y < screen_frame.origin.y {
+                y = screen_frame.origin.y;
+            }
+            if y + win_frame.size.height > screen_frame.origin.y + screen_frame.size.height {
+                y = screen_frame.origin.y + screen_frame.size.height - win_frame.size.height;
+            }
+
+            window.setFrameOrigin(NSPoint::new(x, y));
+        }
 
         let scroll_view = NSTextView::scrollableTextView(mtm);
         let text_view: Retained<NSTextView> =
@@ -94,7 +126,61 @@ pub fn run_editor(config: EditorConfig) -> EditorResult {
             text_view.setString(&NSString::from_str(&config.initial_text));
         }
 
-        window.setContentView(Some(&scroll_view));
+        let hint_height: f64 = 20.0;
+        let content_frame = NSRect::new(
+            NSPoint::new(0.0, 0.0),
+            NSSize::new(config.width, config.height),
+        );
+
+        let container = NSView::initWithFrame(NSView::alloc(mtm), content_frame);
+
+        let scroll_frame = NSRect::new(
+            NSPoint::new(0.0, hint_height),
+            NSSize::new(config.width, config.height - hint_height),
+        );
+        scroll_view.setFrame(scroll_frame);
+        scroll_view.setAutoresizingMask(
+            NSAutoresizingMaskOptions::ViewWidthSizable
+                | NSAutoresizingMaskOptions::ViewHeightSizable,
+        );
+
+        let hint_frame = NSRect::new(
+            NSPoint::new(8.0, 0.0),
+            NSSize::new(config.width - 16.0, hint_height),
+        );
+        let hint_label = NSTextField::wrappingLabelWithString(
+            &NSString::from_str("Enter: 줄바꿈  │  ⌘+Enter: 제출  │  Esc: 취소"),
+            mtm,
+        );
+        hint_label.setFrame(hint_frame);
+        hint_label.setEditable(false);
+        hint_label.setSelectable(false);
+        hint_label.setBordered(false);
+        hint_label.setDrawsBackground(false);
+
+        let hint_font = NSFont::systemFontOfSize(11.0);
+        hint_label.setFont(Some(&hint_font));
+
+        if is_dark {
+            let hint_color = NSColor::colorWithSRGBRed_green_blue_alpha(0.6, 0.6, 0.6, 1.0);
+            hint_label.setTextColor(Some(&hint_color));
+        } else {
+            let hint_color = NSColor::colorWithSRGBRed_green_blue_alpha(0.5, 0.5, 0.5, 1.0);
+            hint_label.setTextColor(Some(&hint_color));
+        }
+
+        hint_label.setAutoresizingMask(NSAutoresizingMaskOptions::ViewWidthSizable);
+
+        container.addSubview(&scroll_view);
+        container.addSubview(&hint_label);
+
+        container.setWantsLayer(true);
+        if let Some(layer) = container.layer() {
+            layer.setCornerRadius(12.0);
+            layer.setMasksToBounds(true);
+        }
+
+        window.setContentView(Some(&container));
         window.makeKeyAndOrderFront(None);
         window.makeFirstResponder(Some(&text_view));
 
