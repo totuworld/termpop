@@ -1,3 +1,4 @@
+mod ax_position;
 mod cli;
 mod clipboard;
 mod config;
