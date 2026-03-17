@@ -1,0 +1,107 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    name: Build macOS binaries
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-release-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-release-
+
+      - name: Extract version
+        id: version
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Building version: $VERSION"
+
+      - name: Build aarch64 (Apple Silicon)
+        run: cargo build --release --target aarch64-apple-darwin
+
+      - name: Build x86_64 (Intel)
+        run: cargo build --release --target x86_64-apple-darwin
+
+      - name: Create Universal Binary
+        run: |
+          lipo -create \
+            target/aarch64-apple-darwin/release/termpop \
+            target/x86_64-apple-darwin/release/termpop \
+            -output termpop-universal
+
+      - name: Package archives
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+
+          tar -czf "termpop-v${VERSION}-macos-arm64.tar.gz" \
+            -C target/aarch64-apple-darwin/release termpop
+
+          tar -czf "termpop-v${VERSION}-macos-x86_64.tar.gz" \
+            -C target/x86_64-apple-darwin/release termpop
+
+          tar -czf "termpop-v${VERSION}-macos-universal.tar.gz" \
+            termpop-universal
+
+      - name: Generate checksums
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          shasum -a 256 termpop-v${VERSION}-*.tar.gz > checksums.txt
+          cat checksums.txt
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: TermPop v${{ steps.version.outputs.version }}
+          generate_release_notes: true
+          files: |
+            termpop-v${{ steps.version.outputs.version }}-macos-arm64.tar.gz
+            termpop-v${{ steps.version.outputs.version }}-macos-x86_64.tar.gz
+            termpop-v${{ steps.version.outputs.version }}-macos-universal.tar.gz
+            checksums.txt
+          body: |
+            ## 설치
+
+            ### 다운로드 후 설치
+            ```bash
+            # Apple Silicon (M1/M2/M3/M4)
+            curl -LO https://github.com/${{ github.repository }}/releases/download/v${{ steps.version.outputs.version }}/termpop-v${{ steps.version.outputs.version }}-macos-arm64.tar.gz
+            tar -xzf termpop-v${{ steps.version.outputs.version }}-macos-arm64.tar.gz
+            sudo mv termpop /usr/local/bin/
+
+            # Intel Mac
+            curl -LO https://github.com/${{ github.repository }}/releases/download/v${{ steps.version.outputs.version }}/termpop-v${{ steps.version.outputs.version }}-macos-x86_64.tar.gz
+            tar -xzf termpop-v${{ steps.version.outputs.version }}-macos-x86_64.tar.gz
+            sudo mv termpop /usr/local/bin/
+            ```
+
+            ### Gatekeeper 우회
+            ```bash
+            xattr -d com.apple.quarantine /usr/local/bin/termpop
+            ```
+
+            ### 접근성 권한
+            데몬 모드 사용 시: 시스템 설정 → 개인정보 보호 및 보안 → 접근성 → termpop 허용

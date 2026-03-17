@@ -25,7 +25,7 @@ pkill -9 -f "termpop"
 sudo cp target/release/termpop /usr/local/bin/termpop
 
 # 3. 접근성 권한 재등록
-#    시스템 설정 → 개인정보 보호 및 보안 → 접근성 → termpop을 `-`로 제거 후 `+`로 다시 추가
+#    시스템 설정 → 개인정보 보호 및 보안 → 접근성(손쉬운사용) → termpop을 `-`로 제거 후 `+`로 다시 추가
 
 # 4. 데몬 재시작
 termpop daemon --install
