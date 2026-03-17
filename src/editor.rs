@@ -33,6 +33,7 @@ const KEYCODE_EQUAL: u16 = 0x18;
 const KEYCODE_MINUS: u16 = 0x1B;
 const KEYCODE_ZERO: u16 = 0x1D;
 const KEYCODE_T: u16 = 0x11;
+const KEYCODE_Z: u16 = 0x06;
 const FONT_SIZE_MIN: f64 = 8.0;
 const FONT_SIZE_MAX: f64 = 72.0;
 const FONT_SIZE_STEP: f64 = 2.0;
@@ -98,7 +99,7 @@ fn build_hint_attributed_string(is_dark: bool) -> objc2::rc::Retained<objc2_foun
         NSColor::colorWithSRGBRed_green_blue_alpha(colors.title.0, colors.title.1, colors.title.2, 1.0);
 
     let title_part = "TermPop";
-    let rest_part = "  │  Enter: New line  │  ⌘+Enter: Submit  │  Esc: Cancel  │  ⌘Z/⌘⇧Z: Undo/Redo  │  ⌃+/⌃-: Font  │  ⌃T: Theme";
+    let rest_part = "  │  Enter: New line  │  ⌘+Enter: Submit  │  Esc: Cancel  │  ⌃+/⌃-: Font  │  ⌃T: Theme";
     let full_hint = format!("{}{}", title_part, rest_part);
 
     unsafe {
@@ -308,6 +309,22 @@ pub fn run_editor(config: EditorConfig) -> EditorResult {
                     let flags = event.modifierFlags();
                     let has_cmd = flags.contains(NSEventModifierFlags::Command);
                     let has_ctrl = flags.contains(NSEventModifierFlags::Control);
+                    let has_shift = flags.contains(NSEventModifierFlags::Shift);
+
+                    if has_cmd && keycode == KEYCODE_Z {
+                        if let Some(undo_manager) = text_view_ref.undoManager() {
+                            if has_shift {
+                                if undo_manager.canRedo() {
+                                    undo_manager.redo();
+                                }
+                            } else {
+                                if undo_manager.canUndo() {
+                                    undo_manager.undo();
+                                }
+                            }
+                        }
+                        continue;
+                    }
 
                     if has_cmd && keycode == KEYCODE_RETURN {
                         let text = text_view_ref.string().to_string();
