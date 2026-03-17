@@ -4,6 +4,7 @@ on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -36,7 +37,11 @@ jobs:
       - name: Extract version
         id: version
         run: |
-          VERSION="${GITHUB_REF_NAME#v}"
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+          else
+            VERSION="0.0.0-dev"
+          fi
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "Building version: $VERSION"
 
@@ -54,9 +59,9 @@ jobs:
             -output termpop-universal
 
       - name: Package archives
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
-          VERSION="${{ steps.version.outputs.version }}"
-
           tar -czf "termpop-v${VERSION}-macos-arm64.tar.gz" \
             -C target/aarch64-apple-darwin/release termpop
 
@@ -67,12 +72,14 @@ jobs:
             termpop-universal
 
       - name: Generate checksums
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
-          VERSION="${{ steps.version.outputs.version }}"
           shasum -a 256 termpop-v${VERSION}-*.tar.gz > checksums.txt
           cat checksums.txt
 
       - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
           name: TermPop v${{ steps.version.outputs.version }}
@@ -82,29 +89,3 @@ jobs:
             termpop-v${{ steps.version.outputs.version }}-macos-x86_64.tar.gz
             termpop-v${{ steps.version.outputs.version }}-macos-universal.tar.gz
             checksums.txt
-          body: |
-            ## 설치
-
-            ### 다운로드 후 설치
-            ```bash
-            # Apple Silicon (M1/M2/M3/M4)
-            curl -LO https://github.com/${{ github.repository }}/releases/download/v${{ steps.version.outputs.version }}/termpop-v${{ steps.version.outputs.version }}-macos-arm64.tar.gz
-            tar -xzf termpop-v${{ steps.version.outputs.version }}-macos-arm64.tar.gz
-            sudo mv termpop /usr/local/bin/
-
-            # Intel Mac
-            curl -LO https://github.com/${{ github.repository }}/releases/download/v${{ steps.version.outputs.version }}/termpop-v${{ steps.version.outputs.version }}-macos-x86_64.tar.gz
-            tar -xzf termpop-v${{ steps.version.outputs.version }}-macos-x86_64.tar.gz
-            sudo mv termpop /usr/local/bin/
-            ```
-
-            ### Gatekeeper 우회 (브라우저로 다운로드한 경우)
-            브라우저에서 직접 다운로드하면 macOS가 quarantine 속성을 붙여 실행을 차단할 수 있습니다.
-            `curl`로 받았다면 이 단계는 건너뛰어도 됩니다.
-            ```bash
-            # "No such xattr" 에러가 나면 이미 정상 — 무시하세요
-            xattr -d com.apple.quarantine /usr/local/bin/termpop
-            ```
-
-            ### 접근성 권한
-            데몬 모드 사용 시: 시스템 설정 → 개인정보 보호 및 보안 → 접근성 → termpop 허용
