@@ -34,6 +34,10 @@ const KEYCODE_MINUS: u16 = 0x1B;
 const KEYCODE_ZERO: u16 = 0x1D;
 const KEYCODE_T: u16 = 0x11;
 const KEYCODE_Z: u16 = 0x06;
+const KEYCODE_V: u16 = 0x09;
+const KEYCODE_C: u16 = 0x08;
+const KEYCODE_X: u16 = 0x07;
+const KEYCODE_A: u16 = 0x00;
 const FONT_SIZE_MIN: f64 = 8.0;
 const FONT_SIZE_MAX: f64 = 72.0;
 const FONT_SIZE_STEP: f64 = 2.0;
@@ -348,6 +352,26 @@ pub fn run_editor(config: EditorConfig) -> EditorResult {
                                 }
                             }
                         }
+                        continue;
+                    }
+
+                    if has_cmd && keycode == KEYCODE_V {
+                        text_view_ref.paste(None);
+                        continue;
+                    }
+
+                    if has_cmd && keycode == KEYCODE_C {
+                        text_view_ref.copy(None);
+                        continue;
+                    }
+
+                    if has_cmd && keycode == KEYCODE_X {
+                        text_view_ref.cut(None);
+                        continue;
+                    }
+
+                    if has_cmd && keycode == KEYCODE_A {
+                        text_view_ref.selectAll(None);
                         continue;
                     }
 
