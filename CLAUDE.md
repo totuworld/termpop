@@ -44,6 +44,7 @@ src/
 ├── main.rs        # 엔트리포인트, CLI 라우팅
 ├── cli.rs         # clap 기반 CLI 파싱
 ├── editor.rs      # NSWindow + NSTextView 네이티브 UI
+├── ax_position.rs # 포커스된 윈도우 위치 조회 (CGWindowList)
 ├── daemon.rs      # tokio Unix socket 서버 + 이벤트 루프
 ├── ipc.rs         # 4byte 길이 + JSON 프로토콜
 ├── clipboard.rs   # 클립보드 저장/복원 + CGEvent 붙여넣기
@@ -55,7 +56,7 @@ src/
 - `objc2` + `objc2-app-kit` — 네이티브 macOS UI (NSTextView/NSWindow)
 - `tokio` — 비동기 Unix socket IPC
 - `global-hotkey` — 글로벌 단축키
-- `core-graphics` — CGEvent (Cmd+V 시뮬레이션)
+- `core-graphics` + `core-foundation` — CGEvent (Cmd+V 시뮬레이션), CGWindowList (윈도우 위치)
 - `clap` — CLI 파싱
 - `serde` + `serde_json` + `toml` — 직렬화/설정
 

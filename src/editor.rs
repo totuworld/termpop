@@ -157,8 +157,33 @@ pub fn run_editor(config: EditorConfig) -> EditorResult {
         window.setHasShadow(true);
         window.setOpaque(false);
 
-        let mouse_pos = NSEvent::mouseLocation();
-        let top_left = NSPoint::new(mouse_pos.x, mouse_pos.y);
+        const WINDOW_BOTTOM_MARGIN: f64 = 80.0;
+
+        // 포커스된 앱 윈도우 하단 중앙에 팝업 배치, 실패 시 마우스 커서 폴백
+        // CGWindowList는 CG 좌표(top-left origin), setFrameTopLeftPoint는 NS 좌표(bottom-left origin)
+        // 변환: ns_y = primary_screen_height - cg_y
+        let primary_screen_h = {
+            let screens = NSScreen::screens(mtm);
+            if screens.count() > 0 {
+                let primary: Retained<NSScreen> = screens.objectAtIndex(0);
+                primary.frame().size.height
+            } else {
+                900.0
+            }
+        };
+
+        let top_left = if let Some((wx, wy, ww, wh)) = crate::ax_position::get_frontmost_window_bounds() {
+            // 윈도우 하단에서 마진만큼 위, 수평 중앙
+            let popup_x = wx + (ww / 2.0) - (config.width / 2.0);
+            let cg_y = wy + wh - WINDOW_BOTTOM_MARGIN;
+            let ns_y = primary_screen_h - cg_y;
+            eprintln!("[termpop] window bounds: ({}, {}, {}, {}), primary_h={}, popup=({}, {})", wx, wy, ww, wh, primary_screen_h, popup_x, ns_y);
+            NSPoint::new(popup_x, ns_y)
+        } else {
+            let mouse_pos = NSEvent::mouseLocation();
+            eprintln!("[termpop] fallback mouse: ({}, {})", mouse_pos.x, mouse_pos.y);
+            NSPoint::new(mouse_pos.x, mouse_pos.y)
+        };
         window.setFrameTopLeftPoint(top_left);
 
         if let Some(screen) = NSScreen::mainScreen(mtm) {
