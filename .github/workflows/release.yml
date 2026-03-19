@@ -14,7 +14,7 @@ env:
 
 jobs:
   build:
-    name: Build macOS binaries
+    name: Build macOS binaries & DMG
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
@@ -43,7 +43,6 @@ jobs:
             VERSION="0.0.0-dev"
           fi
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "Building version: $VERSION"
 
       - name: Build aarch64 (Apple Silicon)
         run: cargo build --release --target aarch64-apple-darwin
@@ -56,36 +55,134 @@ jobs:
           lipo -create \
             target/aarch64-apple-darwin/release/termpop \
             target/x86_64-apple-darwin/release/termpop \
-            -output termpop-universal
+            -output target/release/termpop-universal
 
-      - name: Package archives
+      - name: Import signing certificate
+        if: env.MACOS_CERTIFICATE != ''
+        env:
+          MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
+          MACOS_CERTIFICATE_PWD: ${{ secrets.MACOS_CERTIFICATE_PWD }}
+          KEYCHAIN_PWD: ${{ secrets.KEYCHAIN_PWD }}
+        run: |
+          echo "$MACOS_CERTIFICATE" | base64 --decode > certificate.p12
+          security create-keychain -p "$KEYCHAIN_PWD" build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "$KEYCHAIN_PWD" build.keychain
+          security import certificate.p12 -k build.keychain -P "$MACOS_CERTIFICATE_PWD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PWD" build.keychain
+          rm certificate.p12
+
+      - name: Detect signing identity
+        id: signing
+        run: |
+          IDENTITY=$(security find-identity -v -p codesigning build.keychain 2>/dev/null | grep "Developer ID Application" | head -1 | sed 's/.*"\(.*\)".*/\1/' || true)
+          if [[ -n "$IDENTITY" ]]; then
+            echo "identity=$IDENTITY" >> "$GITHUB_OUTPUT"
+          else
+            echo "identity=" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Package DMG (Apple Silicon)
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          SIGN_ARG=""
+          if [[ -n "${{ steps.signing.outputs.identity }}" ]]; then
+            SIGN_ARG="--sign ${{ steps.signing.outputs.identity }}"
+          fi
+          ./scripts/package-dmg.sh \
+            --version "$VERSION" \
+            --binary target/aarch64-apple-darwin/release/termpop \
+            --arch arm64 \
+            $SIGN_ARG
+
+      - name: Package DMG (Intel)
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          SIGN_ARG=""
+          if [[ -n "${{ steps.signing.outputs.identity }}" ]]; then
+            SIGN_ARG="--sign ${{ steps.signing.outputs.identity }}"
+          fi
+          ./scripts/package-dmg.sh \
+            --version "$VERSION" \
+            --binary target/x86_64-apple-darwin/release/termpop \
+            --arch x86_64 \
+            $SIGN_ARG
+
+      - name: Package DMG (Universal)
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          SIGN_ARG=""
+          if [[ -n "${{ steps.signing.outputs.identity }}" ]]; then
+            SIGN_ARG="--sign ${{ steps.signing.outputs.identity }}"
+          fi
+          ./scripts/package-dmg.sh \
+            --version "$VERSION" \
+            --binary target/release/termpop-universal \
+            --arch universal \
+            $SIGN_ARG
+
+      - name: Notarize DMGs
+        if: steps.signing.outputs.identity != ''
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+        run: |
+          xcrun notarytool store-credentials "termpop-notary" \
+            --apple-id "$APPLE_ID" \
+            --team-id "$APPLE_TEAM_ID" \
+            --password "$APPLE_APP_SPECIFIC_PASSWORD"
+
+          for arch in arm64 x86_64 universal; do
+            DMG="target/TermPop-v${VERSION}-macos-${arch}.dmg"
+            xcrun notarytool submit "$DMG" --keychain-profile "termpop-notary" --wait
+            xcrun stapler staple "$DMG"
+          done
+
+      - name: Package tar.gz archives
         env:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
           tar -czf "termpop-v${VERSION}-macos-arm64.tar.gz" \
             -C target/aarch64-apple-darwin/release termpop
-
           tar -czf "termpop-v${VERSION}-macos-x86_64.tar.gz" \
             -C target/x86_64-apple-darwin/release termpop
-
           tar -czf "termpop-v${VERSION}-macos-universal.tar.gz" \
-            termpop-universal
+            -C target/release termpop-universal
 
       - name: Generate checksums
         env:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
-          shasum -a 256 termpop-v${VERSION}-*.tar.gz > checksums.txt
+          shasum -a 256 \
+            termpop-v${VERSION}-*.tar.gz \
+            target/TermPop-v${VERSION}-*.dmg \
+            > checksums.txt
           cat checksums.txt
+
+      - name: Generate release body
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          sed "s/__VERSION__/$VERSION/g" .github/release_body.md > release_body_final.md
 
       - name: Create GitHub Release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
           name: TermPop v${{ steps.version.outputs.version }}
+          body_path: release_body_final.md
+          append_body: true
           generate_release_notes: true
           files: |
             termpop-v${{ steps.version.outputs.version }}-macos-arm64.tar.gz
             termpop-v${{ steps.version.outputs.version }}-macos-x86_64.tar.gz
             termpop-v${{ steps.version.outputs.version }}-macos-universal.tar.gz
+            target/TermPop-v${{ steps.version.outputs.version }}-macos-arm64.dmg
+            target/TermPop-v${{ steps.version.outputs.version }}-macos-x86_64.dmg
+            target/TermPop-v${{ steps.version.outputs.version }}-macos-universal.dmg
             checksums.txt

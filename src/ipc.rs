@@ -7,6 +7,7 @@ pub enum Request {
         initial_text: Option<String>,
         title: Option<String>,
     },
+    StripPaste,
     Status,
     Shutdown,
 }
@@ -65,6 +66,14 @@ mod tests {
         let json = serde_json::to_string(&req).unwrap();
         let decoded: Request = serde_json::from_str(&json).unwrap();
         assert_eq!(decoded, Request::Shutdown);
+    }
+
+    #[test]
+    fn request_strip_paste_roundtrip() {
+        let req = Request::StripPaste;
+        let json = serde_json::to_string(&req).unwrap();
+        let decoded: Request = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded, Request::StripPaste);
     }
 
     #[test]

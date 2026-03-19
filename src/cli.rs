@@ -24,6 +24,7 @@ pub enum Command {
         #[arg(long)]
         uninstall: bool,
     },
+    StripPaste,
     Status,
     Stop,
 }

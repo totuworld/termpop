@@ -61,6 +61,19 @@ fn main() {
             }
             run_daemon(&cfg);
         }
+        Some(Command::StripPaste) => {
+            if daemon::daemon_is_running() {
+                let rt = tokio::runtime::Runtime::new().expect("failed to create tokio runtime");
+                rt.block_on(async {
+                    match send_strip_paste().await {
+                        Ok(_) => {}
+                        Err(e) => eprintln!("failed to send strip-paste: {}", e),
+                    }
+                });
+            } else {
+                clipboard::strip_and_paste(None);
+            }
+        }
         Some(Command::Status) => {
             let rt = tokio::runtime::Runtime::new().expect("failed to create tokio runtime");
             rt.block_on(async {
@@ -96,6 +109,11 @@ fn run_daemon(cfg: &config::Config) {
         config::parse_hotkey("Cmd+Shift+I").unwrap()
     });
 
+    let strip_paste_hotkey_parsed = config::parse_hotkey(&cfg.strip_paste_hotkey).unwrap_or_else(|| {
+        eprintln!("invalid strip_paste_hotkey '{}', using default Cmd+Shift+V", cfg.strip_paste_hotkey);
+        config::parse_hotkey("Cmd+Shift+V").unwrap()
+    });
+
     unsafe {
         let mtm = MainThreadMarker::new().expect("must be called from main thread");
         let app = NSApplication::sharedApplication(mtm);
@@ -108,15 +126,21 @@ fn run_daemon(cfg: &config::Config) {
             .unwrap_or_else(|e| panic!("failed to register hotkey '{}': {}", cfg.hotkey, e));
         eprintln!("global hotkey registered: {}", cfg.hotkey);
 
+        let strip_hotkey = HotKey::new(Some(strip_paste_hotkey_parsed.0), strip_paste_hotkey_parsed.1);
+        manager
+            .register(strip_hotkey)
+            .unwrap_or_else(|e| panic!("failed to register strip_paste_hotkey '{}': {}", cfg.strip_paste_hotkey, e));
+        eprintln!("strip paste hotkey registered: {}", cfg.strip_paste_hotkey);
+
         let hotkey_receiver = GlobalHotKeyEvent::receiver();
 
-        let (editor_tx, mut editor_rx) = tokio::sync::mpsc::channel::<daemon::EditorRequest>(1);
+        let (action_tx, mut action_rx) = tokio::sync::mpsc::channel::<daemon::DaemonAction>(1);
         let (shutdown_tx, mut shutdown_rx) = tokio::sync::mpsc::channel::<()>(1);
 
         std::thread::spawn(move || {
             let rt = tokio::runtime::Runtime::new().expect("failed to create tokio runtime");
             rt.block_on(async {
-                if let Err(e) = daemon::run_socket_server(editor_tx, shutdown_tx).await {
+                if let Err(e) = daemon::run_socket_server(action_tx, shutdown_tx).await {
                     eprintln!("daemon error: {}", e);
                 }
             });
@@ -152,11 +176,24 @@ fn run_daemon(cfg: &config::Config) {
                         clipboard::paste_text_and_restore(&text, previous_app.as_deref());
                     }
                 }
+
+                if hk_event.id == strip_hotkey.id() && hk_event.state == HotKeyState::Pressed {
+                    let previous_app = clipboard::get_frontmost_app();
+                    clipboard::strip_and_paste(previous_app.as_deref());
+                }
             }
 
-            if let Ok(req) = editor_rx.try_recv() {
-                let result = editor::run_editor(req.config);
-                let _ = req.respond.send(result);
+            if let Ok(action) = action_rx.try_recv() {
+                match action {
+                    daemon::DaemonAction::OpenEditor(req) => {
+                        let result = editor::run_editor(req.config);
+                        let _ = req.respond.send(result);
+                    }
+                    daemon::DaemonAction::StripPaste => {
+                        let previous_app = clipboard::get_frontmost_app();
+                        clipboard::strip_and_paste(previous_app.as_deref());
+                    }
+                }
             }
 
             if shutdown_rx.try_recv().is_ok() {
@@ -217,5 +254,11 @@ async fn query_status() -> Result<Response, std::io::Error> {
 async fn send_shutdown() -> Result<Response, std::io::Error> {
     let mut stream = daemon::connect_to_daemon().await?;
     daemon::send_message(&mut stream, &Request::Shutdown).await?;
+    daemon::recv_message(&mut stream).await
+}
+
+async fn send_strip_paste() -> Result<Response, std::io::Error> {
+    let mut stream = daemon::connect_to_daemon().await?;
+    daemon::send_message(&mut stream, &Request::StripPaste).await?;
     daemon::recv_message(&mut stream).await
 }

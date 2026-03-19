@@ -70,6 +70,19 @@ pub fn paste_text_and_restore(text: &str, previous_app: Option<&NSRunningApplica
     }
 }
 
+pub fn strip_and_paste(previous_app: Option<&NSRunningApplication>) {
+    let text = get_clipboard_text().unwrap_or_default();
+    set_clipboard_text(&text);
+
+    if let Some(app) = previous_app {
+        std::thread::sleep(std::time::Duration::from_millis(50));
+        activate_app(app);
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
+
+    simulate_paste();
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

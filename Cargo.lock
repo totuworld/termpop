@@ -789,13 +789,14 @@ dependencies = [
 
 [[package]]
 name = "termpop"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "clap",
  "core-foundation",
  "core-graphics",
  "dirs",
  "global-hotkey",
+ "libc",
  "objc2",
  "objc2-app-kit",
  "objc2-foundation",

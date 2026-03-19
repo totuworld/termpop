@@ -1,6 +1,6 @@
 [package]
 name = "termpop"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 
 [dependencies]
@@ -37,6 +37,7 @@ objc2-quartz-core = { version = "0.3", features = ["CALayer"] }
 global-hotkey = "0.7"
 core-foundation = "0.10"
 core-graphics = "0.24"
+libc = "0.2"
 
 [dev-dependencies]
 tempfile = "3"

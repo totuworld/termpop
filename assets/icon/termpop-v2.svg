@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#282C34"/>
+      <stop offset="100%" style="stop-color:#21252B"/>
+    </linearGradient>
+  </defs>
+
+  <rect x="32" y="32" width="960" height="960" rx="220" ry="220" fill="url(#bg)"/>
+
+  <g stroke="#61AFEF" stroke-width="36" stroke-linecap="square" stroke-linejoin="miter" fill="none">
+
+    <!-- ㅌ (top-left) : 3 horizontal lines, TADA style -->
+    <line x1="190" y1="220" x2="440" y2="220"/>
+    <line x1="190" y1="320" x2="440" y2="320"/>
+    <line x1="190" y1="420" x2="440" y2="420"/>
+
+    <!-- ㅁ (top-right) : rectangle -->
+    <rect x="580" y="220" width="240" height="200"/>
+
+    <!-- ㄴ (bottom-left) : vertical + horizontal -->
+    <polyline points="190,580 190,780 440,780"/>
+
+    <!-- ㅍ (bottom-right) : 2 horizontal + 2 vertical -->
+    <line x1="580" y1="580" x2="820" y2="580"/>
+    <line x1="580" y1="780" x2="820" y2="780"/>
+    <line x1="650" y1="580" x2="650" y2="780"/>
+    <line x1="750" y1="580" x2="750" y2="780"/>
+
+  </g>
+
+  <line x1="512" y1="160" x2="512" y2="840" stroke="#3E4451" stroke-width="2" opacity="0.3"/>
+  <line x1="150" y1="500" x2="874" y2="500" stroke="#3E4451" stroke-width="2" opacity="0.3"/>
+
+</svg>

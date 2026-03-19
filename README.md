@@ -30,21 +30,36 @@ https://github.com/user-attachments/assets/f4ba0492-8498-4f66-ad4c-17a98b940150
 
 ## 설치
 
+### DMG 다운로드 (권장)
+
+[Releases](https://github.com/totuworld/termpop/releases) 페이지에서 DMG를 다운로드하세요.
+
+1. DMG 열기 → `TermPop.app`을 `/Applications`로 드래그
+2. `Install.command` 더블클릭 → 데몬 자동 설치 + 접근성 설정 화면 안내
+3. 시스템 설정 → 개인정보 보호 및 보안 → 접근성 → `TermPop.app` 추가 및 토글 활성화
+4. 끝! `Cmd+Shift+I`로 사용하세요
+
+> ⚠️ macOS Tahoe(26)부터 CLI 바이너리는 접근성 목록에 직접 등록이 불가합니다.
+> `.app` 번들(DMG) 설치를 권장합니다.
+
 ### 소스에서 빌드
 
 ```bash
-# 필수: macOS 10.13+, Rust 1.70+, Xcode Command Line Tools
 git clone https://github.com/totuworld/termpop.git
 cd termpop
 cargo build --release
-cp target/release/termpop /usr/local/bin/
+./scripts/package-dmg.sh
+open target/dmg-build  # TermPop.app을 /Applications로 복사
 ```
 
-### cargo install
+### cargo install (개발자용)
 
 ```bash
 cargo install --path .
 ```
+
+CLI 바이너리로 설치 시 접근성 권한 등록이 안 될 수 있습니다.
+자세한 내용은 [DISTRIBUTION.md](DISTRIBUTION.md)를 참고하세요.
 
 ## 사용법
 
@@ -156,28 +171,29 @@ src/
 
 데몬 모드에서 글로벌 핫키와 자동 붙여넣기를 사용하려면 macOS 접근성 권한이 필요합니다.
 
-시스템 설정 → 개인정보 보호 및 보안 → 접근성 → termpop 허용
+시스템 설정 → 개인정보 보호 및 보안 → 접근성 → `TermPop.app` 허용
+
+### ⚠️ CLI 바이너리와 접근성 권한
+
+macOS Tahoe(26)부터 adhoc 서명된 CLI 바이너리는 접근성 목록에 등록되지 않습니다.
+DMG로 설치한 `.app` 번들을 사용하면 이 문제가 해결됩니다.
 
 ### ⚠️ 재빌드 후 접근성 권한 재등록 필요
 
-macOS는 접근성 권한을 **바이너리 해시** 기준으로 관리합니다. `cargo build`로 재컴파일하면 바이너리가 변경되어 기존 접근성 권한이 무효화됩니다. 이때 CGEvent(Cmd+V 시뮬레이션)가 **에러 없이 조용히 실패**하므로, 붙여넣기가 안 되는데 로그에는 정상으로 보입니다.
+macOS는 접근성 권한을 **바이너리 해시** 기준으로 관리합니다. 재빌드하면 기존 권한이 무효화됩니다.
 
 재빌드 후 붙여넣기가 안 되면:
 
 ```bash
-# 1. 데몬 중지
 termpop daemon --uninstall
 pkill -9 -f "termpop"
 
-# 2. 새 바이너리 복사
-sudo cp target/release/termpop /usr/local/bin/termpop
+# .app 번들 재생성
+./scripts/package-dmg.sh
+cp -R target/dmg-build/TermPop.app /Applications/
 
-# 3. 접근성 권한 재등록
-#    시스템 설정 → 개인정보 보호 및 보안 → 접근성(손쉬운사용)에서
-#    termpop을 `-` 버튼으로 제거 후 `+`로 다시 추가
-
-# 4. 데몬 재시작
-termpop daemon --install
+# 시스템 설정에서 TermPop.app 제거 후 다시 추가
+/Applications/TermPop.app/Contents/MacOS/termpop daemon --install
 ```
 
 

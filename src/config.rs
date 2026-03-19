@@ -13,6 +13,8 @@ pub struct Config {
     pub window_height: f64,
     #[serde(default = "default_theme")]
     pub theme: String,
+    #[serde(default = "default_strip_paste_hotkey")]
+    pub strip_paste_hotkey: String,
 }
 
 fn default_hotkey() -> String {
@@ -30,6 +32,9 @@ fn default_height() -> f64 {
 fn default_theme() -> String {
     "dark".to_string()
 }
+fn default_strip_paste_hotkey() -> String {
+    "Cmd+Shift+V".to_string()
+}
 
 impl Default for Config {
     fn default() -> Self {
@@ -39,6 +44,7 @@ impl Default for Config {
             window_width: default_width(),
             window_height: default_height(),
             theme: default_theme(),
+            strip_paste_hotkey: default_strip_paste_hotkey(),
         }
     }
 }
@@ -149,6 +155,7 @@ mod tests {
         assert_eq!(config.window_width, 600.0);
         assert_eq!(config.window_height, 300.0);
         assert_eq!(config.theme, "dark");
+        assert_eq!(config.strip_paste_hotkey, "Cmd+Shift+V");
     }
 
     #[test]

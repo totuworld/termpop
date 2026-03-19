@@ -1,230 +1,128 @@
 # TermPop 배포 가이드
 
-TermPop을 일반 사용자에게 전달하기 위한 패키징 및 배포 방법을 정리합니다.
+## 배포 형태
 
-## 배포 옵션 비교
+| 형태 | 대상 | 접근성 권한 |
+|------|------|------------|
+| DMG (.app 번들) | 일반 사용자 | 시스템 설정에서 바로 등록 가능 |
+| tar.gz (CLI 바이너리) | 개발자 | macOS 버전에 따라 등록 불가할 수 있음 |
+| Homebrew Tap | macOS 개발자 | 위와 동일 |
 
-| 방법 | 난이도 | 대상 사용자 | 장점 | 단점 |
-|------|--------|------------|------|------|
-| GitHub Release + 바이너리 | ★☆☆ | 개발자 | 가장 간단 | 수동 다운로드 필요 |
-| Homebrew Tap | ★★☆ | macOS 개발자 | `brew install` 한 줄 | Tap 저장소 관리 필요 |
-| cargo install | ★☆☆ | Rust 개발자 | crates.io 등록 시 자동 | Rust 툴체인 필요 |
-| cargo-dist (자동화) | ★★☆ | 모든 사용자 | CI/CD 자동화, 멀티 아키텍처 | 초기 설정 필요 |
-
-TermPop은 CLI 도구이므로 `.app` 번들이나 DMG는 불필요합니다.
-추천 조합: **GitHub Release + Homebrew Tap** (+ cargo-dist로 자동화)
+macOS Tahoe(26)부터 CLI 바이너리를 접근성 목록에 직접 등록하는 것이 불가능해졌습니다.
+`.app` 번들로 감싸야 macOS가 접근성 권한 대상으로 인식합니다.
+따라서 DMG 배포가 기본 권장 방식입니다.
 
 ---
 
-## 1. GitHub Release + 바이너리 배포
+## DMG 배포 (권장)
 
-가장 기본적인 방법. 빌드한 바이너리를 GitHub Release에 첨부합니다.
+### 구조
 
-### 수동 빌드 및 릴리스
-
-```bash
-# Apple Silicon (M1/M2/M3/M4)
-cargo build --release --target aarch64-apple-darwin
-
-# Intel Mac
-cargo build --release --target x86_64-apple-darwin
-
-# Universal Binary (두 아키텍처 합치기)
-lipo -create \
-  target/aarch64-apple-darwin/release/termpop \
-  target/x86_64-apple-darwin/release/termpop \
-  -output termpop-universal
-
-# 압축
-tar -czf termpop-v0.1.0-macos-arm64.tar.gz -C target/aarch64-apple-darwin/release termpop
-tar -czf termpop-v0.1.0-macos-x86_64.tar.gz -C target/x86_64-apple-darwin/release termpop
-tar -czf termpop-v0.1.0-macos-universal.tar.gz termpop-universal
-
-# SHA256 체크섬 생성
-shasum -a 256 termpop-v0.1.0-*.tar.gz > checksums.txt
+```
+TermPop.app/
+├── Contents/
+│   ├── Info.plist          ← 번들 메타데이터 + 접근성 설명
+│   ├── MacOS/
+│   │   └── termpop         ← 바이너리
+│   └── Resources/
+│       └── termpop.icns    ← 앱 아이콘
 ```
 
-GitHub에서 Release 생성 후 `.tar.gz` 파일들을 첨부합니다.
-
-### 사용자 설치 방법
+### 로컬 빌드
 
 ```bash
-# 다운로드 후
-tar -xzf termpop-v0.1.0-macos-arm64.tar.gz
-chmod +x termpop
-sudo mv termpop /usr/local/bin/
+cargo build --release
+./scripts/package-dmg.sh
 ```
 
----
+### 코드 서명 + 공증 포함 빌드
 
-## 2. Homebrew Tap
+```bash
+./scripts/package-dmg.sh \
+  --sign "Developer ID Application: Your Name (TEAMID)" \
+  --notarize
+```
 
-macOS 사용자에게 가장 친숙한 설치 경험을 제공합니다.
+공증에는 사전에 `notarytool` 자격 증명 저장이 필요합니다:
 
-### Tap 저장소 생성
-
-GitHub에 `homebrew-tap` 저장소를 만들고 `Formula/termpop.rb`를 작성합니다.
-
-```ruby
-class Termpop < Formula
-  desc "터미널에서 호출하는 네이티브 macOS 팝업 텍스트 에디터"
-  homepage "https://github.com/totuworld/termpop"
-  version "0.1.0"
-
-  on_macos do
-    on_arm do
-      url "https://github.com/totuworld/termpop/releases/download/v0.1.0/termpop-v0.1.0-macos-arm64.tar.gz"
-      sha256 "ARM64_SHA256_HERE"
-    end
-    on_intel do
-      url "https://github.com/totuworld/termpop/releases/download/v0.1.0/termpop-v0.1.0-macos-x86_64.tar.gz"
-      sha256 "X86_64_SHA256_HERE"
-    end
-  end
-
-  def install
-    bin.install "termpop"
-  end
-
-  test do
-    assert_match "termpop", shell_output("#{bin}/termpop --help")
-  end
-end
+```bash
+xcrun notarytool store-credentials "termpop-notary" \
+  --apple-id "your@email.com" \
+  --team-id "TEAMID" \
+  --password "app-specific-password"
 ```
 
 ### 사용자 설치 방법
 
+1. DMG 다운로드 후 열기
+2. `TermPop.app`을 `/Applications`로 드래그
+3. 시스템 설정 → 개인정보 보호 및 보안 → 접근성 → `+` → `TermPop.app` 추가
+4. 터미널에서 데몬 시작:
+
 ```bash
-brew tap totuworld/tap
-brew install termpop
+/Applications/TermPop.app/Contents/MacOS/termpop daemon --install
 ```
 
 ---
 
-## 3. cargo-dist로 릴리스 자동화 (추천)
+## GitHub Actions 자동 릴리스
 
-[cargo-dist](https://github.com/axodotdev/cargo-dist)는 GitHub Actions로 빌드, 릴리스, Homebrew 포뮬러 업데이트까지 자동화합니다.
-
-### 초기 설정
+태그 푸시 시 자동으로 빌드 → 서명 → 공증 → 릴리스가 진행됩니다.
 
 ```bash
-# cargo-dist 설치
-cargo install cargo-dist
-
-# 프로젝트에 cargo-dist 초기화
-cargo dist init
-```
-
-`Cargo.toml`에 다음이 추가됩니다:
-
-```toml
-[workspace.metadata.dist]
-cargo-dist-version = "0.27.0"
-ci = "github"
-installers = ["shell", "homebrew"]
-tap = "totuworld/homebrew-tap"
-publish-jobs = ["homebrew"]
-targets = [
-    "aarch64-apple-darwin",
-    "x86_64-apple-darwin",
-]
-```
-
-### 릴리스 프로세스
-
-```bash
-# 버전 태그 생성 → GitHub Actions가 자동으로 빌드 + 릴리스
 git tag v0.1.0
 git push origin v0.1.0
 ```
 
-자동으로 수행되는 작업:
-- aarch64, x86_64 바이너리 빌드
-- GitHub Release 생성 및 바이너리 첨부
-- Homebrew 포뮬러 자동 업데이트
-- 설치 스크립트 생성
+### 필요한 GitHub Secrets
 
-### 사용자 설치 방법 (자동 생성됨)
+코드 서명 + 공증을 사용하려면 다음 시크릿을 설정하세요:
+
+| Secret | 설명 |
+|--------|------|
+| `MACOS_CERTIFICATE` | Developer ID 인증서 (.p12) base64 인코딩 |
+| `MACOS_CERTIFICATE_PWD` | .p12 파일 비밀번호 |
+| `KEYCHAIN_PWD` | CI 키체인 비밀번호 (임의 값) |
+| `APPLE_ID` | Apple ID 이메일 |
+| `APPLE_TEAM_ID` | Apple Developer Team ID |
+| `APPLE_APP_SPECIFIC_PASSWORD` | 앱 전용 비밀번호 (appleid.apple.com에서 생성) |
+
+시크릿이 없으면 ad-hoc 서명으로 빌드됩니다. 이 경우 사용자에게 Gatekeeper 우회 안내가 필요합니다:
 
 ```bash
-# 원라인 설치 스크립트
-curl --proto '=https' --tlsv1.2 -LsSf https://github.com/totuworld/termpop/releases/latest/download/termpop-installer.sh | sh
-
-# 또는 Homebrew
-brew tap totuworld/tap
-brew install termpop
+xattr -d com.apple.quarantine /Applications/TermPop.app
 ```
+
+### 인증서 base64 인코딩 방법
+
+```bash
+base64 -i certificate.p12 | pbcopy
+```
+
+클립보드에 복사된 값을 `MACOS_CERTIFICATE` 시크릿에 붙여넣기.
 
 ---
 
-## 4. crates.io 등록
+## 릴리스 산출물
 
-Rust 개발자를 위한 배포 채널입니다.
-
-### 준비
-
-`Cargo.toml`에 메타데이터를 추가합니다:
-
-```toml
-[package]
-name = "termpop"
-version = "0.1.0"
-edition = "2021"
-description = "터미널에서 호출하는 네이티브 macOS 팝업 텍스트 에디터"
-license = "MIT"
-repository = "https://github.com/totuworld/termpop"
-keywords = ["terminal", "editor", "macos", "popup", "clipboard"]
-categories = ["command-line-utilities"]
-```
-
-### 배포
-
-```bash
-cargo login
-cargo publish
-```
-
-### 사용자 설치 방법
-
-```bash
-cargo install termpop
-```
+| 파일 | 설명 |
+|------|------|
+| `TermPop-v{VERSION}-macos-arm64.dmg` | Apple Silicon DMG |
+| `TermPop-v{VERSION}-macos-x86_64.dmg` | Intel DMG |
+| `TermPop-v{VERSION}-macos-universal.dmg` | Universal DMG |
+| `termpop-v{VERSION}-macos-arm64.tar.gz` | Apple Silicon 바이너리 |
+| `termpop-v{VERSION}-macos-x86_64.tar.gz` | Intel 바이너리 |
+| `termpop-v{VERSION}-macos-universal.tar.gz` | Universal 바이너리 |
+| `checksums.txt` | SHA256 체크섬 |
 
 ---
 
-## 추천 배포 전략
+## 접근성 권한이 필요한 이유
 
-### Phase 1 (지금 바로)
-1. GitHub Release에 수동 빌드 바이너리 첨부
-2. README에 설치 방법 안내
+TermPop 데몬은 다음 기능에 macOS 접근성 API를 사용합니다:
 
-### Phase 2 (사용자 늘어나면)
-1. cargo-dist 설정으로 릴리스 자동화
-2. Homebrew Tap 생성
-3. crates.io 등록
+- 글로벌 핫키 등록 (`global-hotkey`)
+- Cmd+V 키 이벤트 시뮬레이션 (`CGEvent`)
 
-### Phase 3 (선택)
-1. 코드 서명 + 공증 (Gatekeeper 경고 제거)
-   - Apple Developer 계정 필요 ($99/년)
-   - `codesign --sign "Developer ID" termpop`
-   - `xcrun notarytool submit termpop.zip`
-
----
-
-## 주의사항
-
-### macOS 접근성 권한
-데몬 모드의 글로벌 핫키와 CGEvent 붙여넣기는 접근성 권한이 필요합니다. 사용자에게 안내가 필요합니다:
-
-> 시스템 설정 → 개인정보 보호 및 보안 → 접근성 → termpop 허용
-
-### Gatekeeper
-코드 서명 없이 배포하면 "확인되지 않은 개발자" 경고가 표시됩니다. 사용자에게 우회 방법을 안내합니다:
-
-```bash
-# Gatekeeper 우회 (다운로드한 바이너리)
-xattr -d com.apple.quarantine /usr/local/bin/termpop
-```
-
-### macOS 전용
-TermPop은 AppKit, CGEvent 등 macOS 네이티브 API에 의존하므로 macOS에서만 동작합니다.
+`.app` 번들로 배포하면 `Info.plist`의 `NSAccessibilityUsageDescription`을 통해
+사용자에게 권한 요청 사유를 명확히 전달할 수 있습니다.

@@ -10,6 +10,11 @@ pub struct EditorRequest {
     pub respond: tokio::sync::oneshot::Sender<EditorResult>,
 }
 
+pub enum DaemonAction {
+    OpenEditor(EditorRequest),
+    StripPaste,
+}
+
 pub async fn send_message<T: serde::Serialize>(
     stream: &mut UnixStream,
     msg: &T,
@@ -55,7 +60,7 @@ pub async fn connect_to_daemon() -> std::io::Result<UnixStream> {
 }
 
 pub async fn run_socket_server(
-    editor_tx: mpsc::Sender<EditorRequest>,
+    action_tx: mpsc::Sender<DaemonAction>,
     shutdown_tx: mpsc::Sender<()>,
 ) -> std::io::Result<()> {
     let sock_path = ensure_socket_dir()?;
@@ -86,7 +91,7 @@ pub async fn run_socket_server(
                 };
 
                 let (tx, rx) = tokio::sync::oneshot::channel();
-                if editor_tx.send(EditorRequest { config, respond: tx }).await.is_err() {
+                if action_tx.send(DaemonAction::OpenEditor(EditorRequest { config, respond: tx })).await.is_err() {
                     let resp = Response::Result {
                         text: String::new(),
                         cancelled: true,
@@ -107,6 +112,10 @@ pub async fn run_socket_server(
                     },
                 };
                 let _ = send_message(&mut stream, &resp).await;
+            }
+            Request::StripPaste => {
+                let _ = action_tx.send(DaemonAction::StripPaste).await;
+                let _ = send_message(&mut stream, &Response::Ok).await;
             }
             Request::Status => {
                 let resp = Response::Status {
