@@ -56,12 +56,40 @@ xcrun notarytool store-credentials "termpop-notary" \
 
 1. DMG 다운로드 후 열기
 2. `TermPop.app`을 `/Applications`로 드래그
-3. 시스템 설정 → 개인정보 보호 및 보안 → 접근성 → `+` → `TermPop.app` 추가
-4. 터미널에서 데몬 시작:
+3. `Install.command` 더블클릭 → 데몬 자동 설치 + 접근성 설정 안내
+4. 시스템 설정 → 개인정보 보호 및 보안 → 접근성 → `+` → `TermPop.app` 추가
+
+### "Apple could not verify" 경고 대응
+
+공증 없이 배포하면 macOS Gatekeeper가 앱과 `Install.command` 실행을 차단합니다.
+사용자에게 아래 방법을 안내하세요.
+
+**방법 1: 우클릭으로 열기 (가장 간단)**
+
+1. Finder → 응용 프로그램 → `TermPop` 찾기
+2. Control + 클릭 → **열기** 선택
+3. "확인되지 않은 개발자" 경고에서 **열기** 클릭
+4. 이후 `Install.command`도 같은 방식으로 실행
+
+> 처음 한 번만 이렇게 열면 이후부터는 더블클릭으로 정상 실행됩니다.
+
+**방법 2: 터미널 명령어 (quarantine 속성 제거)**
 
 ```bash
-/Applications/TermPop.app/Contents/MacOS/termpop daemon --install
+xattr -cr /Applications/TermPop.app
 ```
+
+`Install.command`도 차단되는 경우 DMG 마운트 경로에서:
+
+```bash
+xattr -cr /Volumes/TermPop/Install.command
+```
+
+**방법 3: 시스템 설정에서 허용**
+
+1. `TermPop.app`을 더블클릭 (차단됨)
+2. 시스템 설정 → 개인정보 보호 및 보안
+3. 하단에 "TermPop이(가) 차단되었습니다" 옆 **확인 없이 열기** 클릭
 
 ---
 

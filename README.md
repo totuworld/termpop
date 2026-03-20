@@ -42,6 +42,32 @@ https://github.com/user-attachments/assets/f4ba0492-8498-4f66-ad4c-17a98b940150
 > ⚠️ macOS Tahoe(26)부터 CLI 바이너리는 접근성 목록에 직접 등록이 불가합니다.
 > `.app` 번들(DMG) 설치를 권장합니다.
 
+#### "Apple could not verify" 경고가 뜨는 경우
+
+TermPop은 Apple 공증(notarization)을 받지 않은 앱이라 macOS Gatekeeper가 차단할 수 있습니다. 아래 방법 중 하나로 해결하세요.
+
+**방법 1: 우클릭으로 열기 (가장 간단)**
+
+1. Finder → 응용 프로그램 → `TermPop` 찾기
+2. Control + 클릭 (또는 트랙패드 두 손가락 클릭) → **열기** 선택
+3. "확인되지 않은 개발자" 경고에서 **열기** 클릭
+
+> 처음 한 번만 이렇게 열면 이후부터는 더블클릭으로 정상 실행됩니다.
+
+**방법 2: 터미널 명령어**
+
+```bash
+xattr -cr /Applications/TermPop.app
+```
+
+실행 후 앱을 열면 경고 없이 바로 실행됩니다.
+
+**방법 3: 시스템 설정에서 허용**
+
+1. `TermPop.app`을 더블클릭 (차단됨)
+2. 시스템 설정 → 개인정보 보호 및 보안
+3. 하단에 "TermPop이(가) 차단되었습니다" 옆 **확인 없이 열기** 클릭
+
 ### 소스에서 빌드
 
 ```bash

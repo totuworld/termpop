@@ -101,6 +101,8 @@ ln -s /Applications "$DMG_TEMP/Applications"
 cp "$PROJECT_DIR/packaging/Install.command" "$DMG_TEMP/Install.command"
 chmod +x "$DMG_TEMP/Install.command"
 
+cp "$PROJECT_DIR/packaging/설치 가이드.txt" "$DMG_TEMP/설치 가이드.txt"
+
 # Create DMG
 rm -f "$DMG_PATH"
 hdiutil create \

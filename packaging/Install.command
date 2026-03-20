@@ -20,6 +20,14 @@ fi
 
 echo "✅ TermPop.app 확인됨"
 
+# Gatekeeper quarantine 속성 제거
+if xattr -p com.apple.quarantine "$APP_PATH" &>/dev/null; then
+  echo ""
+  echo "→ Gatekeeper quarantine 속성을 제거합니다..."
+  xattr -cr "$APP_PATH"
+  echo "  ✓ quarantine 속성 제거됨"
+fi
+
 if [ -f "$OLD_BINARY" ] || [ -f "$OLD_PLIST" ]; then
   echo ""
   echo "→ 이전 버전(CLI) 설치가 감지되었습니다. 정리합니다..."
